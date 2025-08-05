@@ -1,0 +1,81 @@
+
+import { Schemas, joiToSwagger } from '../utils/joi-to-swagger';
+import { schemas } from './validation';
+
+const swaggerDefinition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'WhatsApp Web.js API',
+    version: '1.0.0',
+    description:
+      'A RESTful API wrapper for the whatsapp-web.js library, designed to be hosted on your own server. This API provides a set of endpoints to interact with WhatsApp, allowing you to send messages, manage contacts, and handle devices programmatically. Secure, scalable, and easy to integrate into your applications.',
+    license: {
+      name: 'MIT',
+      url: 'https://github.com/your-repo/blob/main/LICENSE',
+    },
+    contact: {
+      name: 'API Support',
+      url: 'https://github.com/your-repo/issues',
+      email: 'support@example.com',
+    },
+  },
+  servers: [
+    {
+      url: `/api`,
+      description: 'Development server',
+    },
+  ],
+  tags: [
+    {
+      name: 'Devices',
+      description: 'Endpoints for managing WhatsApp devices (sessions).',
+    },
+    {
+      name: 'Messages',
+      description: 'Endpoints for sending and fetching messages.',
+    },
+    {
+      name: 'Groups',
+      description: 'Endpoints for managing WhatsApp groups.',
+    },
+    {
+      name: 'Contacts',
+      description: 'Endpoints for retrieving contact information.',
+    },
+    {
+      name: 'Legacy',
+      description: 'Legacy endpoints maintained for backward compatibility.',
+    },
+    {
+      name: 'Admin',
+      description: 'Administrative endpoints for system management.',
+    },
+    {
+      name: 'Examples',
+      description: 'Example endpoints demonstrating various features.',
+    },
+    {
+      name: 'Validation Examples',
+      description: 'Examples showcasing Joi validation patterns.',
+    },
+  ],
+  components: {
+    schemas: joiToSwagger(schemas as Schemas).swagger,
+    securitySchemes: {
+      ApiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-KEY',
+        description: 'API key for authentication. Contact admin to get one.',
+      },
+    },
+  },
+  security: [
+    {
+      ApiKeyAuth: [],
+    },
+  ],
+};
+
+export default swaggerDefinition;
+

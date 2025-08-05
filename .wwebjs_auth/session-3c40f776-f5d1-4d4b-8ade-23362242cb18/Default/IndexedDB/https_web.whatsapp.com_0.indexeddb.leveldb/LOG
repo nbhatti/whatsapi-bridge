@@ -1,0 +1,13 @@
+2025/08/06-03:41:47.633 fc03 Reusing MANIFEST /Users/naseer/AI-Projects/WhatsApp/whatsapp-web.js-rest-api-wrapper/server/.wwebjs_auth/session-3c40f776-f5d1-4d4b-8ade-23362242cb18/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/08/06-03:41:47.633 fc03 Recovering log #167
+2025/08/06-03:41:47.654 fc03 Reusing old log /Users/naseer/AI-Projects/WhatsApp/whatsapp-web.js-rest-api-wrapper/server/.wwebjs_auth/session-3c40f776-f5d1-4d4b-8ade-23362242cb18/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000167.log 
+2025/08/06-03:41:49.594 16b03 Level-0 table #172: started
+2025/08/06-03:41:49.607 16b03 Level-0 table #172: 455876 bytes OK
+2025/08/06-03:41:49.621 16b03 Delete type=0 #167
+2025/08/06-03:41:49.622 16b03 Manual compaction at level-0 from '\x00=\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00>\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/08/06-03:41:51.074 1f203 Compacting 1@1 + 1@2 files
+2025/08/06-03:41:51.116 1f203 Generated table #173@1: 45024 keys, 1584595 bytes
+2025/08/06-03:41:51.116 1f203 Compacted 1@1 + 1@2 files => 1584595 bytes
+2025/08/06-03:41:51.125 1f203 compacted to: files[ 0 0 1 0 0 0 0 ]
+2025/08/06-03:41:51.125 1f203 Delete type=2 #172
+2025/08/06-03:41:51.125 1f203 Delete type=2 #169

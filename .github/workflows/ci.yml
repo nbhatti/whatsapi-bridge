@@ -1,0 +1,59 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: npm install
+
+    # TODO: Fix ESLint configuration and re-enable
+    # - name: Run Lint
+    #   run: npm run lint
+
+    - name: Run Tests with Coverage
+      run: npm run test:coverage
+      env:
+        CI: true
+        REDIS_URL: redis://localhost:6379/0
+        API_KEY: test-api-key
+
+    - name: Upload Coverage Reports
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Build Docker Image
+      if: ${{ github.ref == 'refs/heads/main' && matrix.node-version == '20.x' }}
+      run: |
+        docker build . \
+          --tag my-image-name:$(date +%s) \
+          --build-arg NPM_TOKEN=${{ secrets.NPM_TOKEN }}
