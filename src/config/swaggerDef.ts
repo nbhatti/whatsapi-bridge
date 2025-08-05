@@ -27,32 +27,44 @@ const swaggerDefinition = {
   ],
   tags: [
     {
-      name: 'Devices',
-      description: 'Endpoints for managing WhatsApp devices (sessions).',
+      name: 'Admin',
+      description: 'Administrative endpoints for system management.',
     },
     {
-      name: 'Messages',
-      description: 'Endpoints for sending and fetching messages.',
+      name: 'AI',
+      description: 'AI-powered chat analysis and intelligent features.',
     },
     {
-      name: 'Groups',
-      description: 'Endpoints for managing WhatsApp groups.',
+      name: 'Chats',
+      description: 'Endpoints for managing WhatsApp chats and conversations.',
     },
     {
       name: 'Contacts',
       description: 'Endpoints for retrieving contact information.',
     },
     {
-      name: 'Legacy',
-      description: 'Legacy endpoints maintained for backward compatibility.',
-    },
-    {
-      name: 'Admin',
-      description: 'Administrative endpoints for system management.',
+      name: 'Devices',
+      description: 'Endpoints for managing WhatsApp devices (sessions).',
     },
     {
       name: 'Examples',
       description: 'Example endpoints demonstrating various features.',
+    },
+    {
+      name: 'Future',
+      description: 'Future and experimental endpoints under development.',
+    },
+    {
+      name: 'Groups',
+      description: 'Endpoints for managing WhatsApp groups.',
+    },
+    {
+      name: 'Legacy',
+      description: 'Legacy endpoints maintained for backward compatibility.',
+    },
+    {
+      name: 'Messages',
+      description: 'Endpoints for sending and fetching messages.',
     },
     {
       name: 'Validation Examples',

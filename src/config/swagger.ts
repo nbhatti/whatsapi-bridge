@@ -33,6 +33,14 @@ export const setupSwagger = (app: Application): void => {
       customCss,
       customSiteTitle: 'WhatsApp Web.js API Docs',
       customfavIcon: '/static/favicon.ico', // Example: add a favicon
+      swaggerOptions: {
+        tagsSorter: 'alpha', // Sort tags alphabetically
+        operationsSorter: 'alpha', // Sort operations alphabetically within each tag
+        docExpansion: 'list', // Expand only the tags list by default
+        filter: true, // Enable search filter
+        showExtensions: true,
+        showCommonExtensions: true,
+      },
     })
   );
 
