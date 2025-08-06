@@ -1,0 +1,74 @@
+version: 2
+
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "nbhatti"
+    assignees:
+      - "nbhatti"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    allow:
+      # Allow all dependency types
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Ignore major version updates for whatsapp-web.js (requires manual testing)
+      - dependency-name: "whatsapp-web.js"
+        update-types: ["version-update:semver-major"]
+      # Ignore major version updates for Node.js types (tied to engine version)
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "03:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "nbhatti"
+    assignees:
+      - "nbhatti"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "automated"
+
+  # Enable version updates for Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "nbhatti"
+    assignees:
+      - "nbhatti"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "docker"
+      - "automated"

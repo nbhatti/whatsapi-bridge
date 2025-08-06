@@ -1,0 +1,31 @@
+name: "WhatsAPI Bridge CodeQL Config"
+
+# Disable default queries to use only security-focused ones
+disable-default-queries: false
+
+# Include additional security-focused query suites
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Paths to analyze
+paths:
+  - src/
+  - scripts/
+
+# Paths to ignore during analysis
+paths-ignore:
+  - node_modules/
+  - dist/
+  - coverage/
+  - docs/
+  - logs/
+  - sessions/
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+
+# Pack configurations
+packs:
+  typescript:
+    - codeql/typescript-queries:AlertSuppression.ql
+    - codeql/typescript-queries:Security/CWE-094

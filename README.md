@@ -1,10 +1,15 @@
 # 🚀 WhatsAPI Bridge
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![CI/CD Pipeline](https://github.com/nbhatti/whatsapi-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/nbhatti/whatsapi-bridge/actions/workflows/ci.yml)
+[![Release Pipeline](https://github.com/nbhatti/whatsapi-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/nbhatti/whatsapi-bridge/actions/workflows/release.yml)
+[![CodeQL](https://github.com/nbhatti/whatsapi-bridge/actions/workflows/codeql.yml/badge.svg)](https://github.com/nbhatti/whatsapi-bridge/actions/workflows/codeql.yml)
+[![Codecov](https://codecov.io/gh/nbhatti/whatsapi-bridge/branch/main/graph/badge.svg)](https://codecov.io/gh/nbhatti/whatsapi-bridge)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)](https://www.typescriptlang.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-5.1.0-lightgrey)](https://expressjs.com/)
 [![WhatsApp Web.js](https://img.shields.io/badge/WhatsApp%20Web.js-1.31.0-25D366)](https://wwebjs.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://github.com/nbhatti/whatsapi-bridge/pkgs/container/whatsapi-bridge)
 
 **Enterprise-grade WhatsApp Web.js REST API Bridge with AI capabilities, TypeScript, Redis, and Socket.IO support for seamless messaging automation.**
 
@@ -319,6 +324,43 @@ Monitor your WhatsAPI Bridge instance:
 - **Metrics:** Real-time system metrics
 - **Redis Status:** Connection status monitoring
 - **Memory Usage:** Application memory tracking
+
+## 🔄 CI/CD & Automation
+
+WhatsAPI Bridge includes enterprise-grade CI/CD pipelines with comprehensive automation:
+
+### 🚀 **Continuous Integration Pipeline**
+- **Multi-Platform Testing** - Ubuntu, Windows, macOS
+- **Node.js Matrix** - Tests on Node.js 22 & 24
+- **Quality Gates** - Linting, formatting, security audits
+- **Docker Integration** - Automated container builds and testing
+- **Performance Analysis** - Bundle size tracking and optimization
+- **Dependency Management** - Automated vulnerability scanning
+
+### 🛡️ **Security & Code Analysis**
+- **CodeQL Analysis** - GitHub's semantic code analysis
+- **Trivy Container Scanning** - Docker image vulnerability detection
+- **Automated Security Audits** - Weekly dependency vulnerability checks
+- **SARIF Integration** - Security findings in GitHub Security tab
+
+### 📦 **Release Automation**
+- **Semantic Versioning** - Automated version bumping
+- **Multi-Architecture Docker** - AMD64 and ARM64 container builds
+- **GitHub Container Registry** - Automated Docker image publishing
+- **Release Assets** - Compiled distributions and source archives
+- **Changelog Generation** - Automated release notes from git history
+
+### 🤖 **Dependency Management**
+- **Dependabot Integration** - Automated dependency updates
+- **Smart Scheduling** - Weekly updates with intelligent grouping
+- **Security Priority** - Critical security patches auto-merged
+- **Manual Review** - Major version updates require approval
+
+### 📈 **Monitoring & Reporting**
+- **Code Coverage** - Codecov integration with detailed reporting
+- **Build Notifications** - Real-time status updates
+- **Performance Metrics** - Bundle size and build time tracking
+- **Quality Trends** - Long-term code health monitoring
 
 ## 🤝 Contributing
 
