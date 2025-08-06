@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { DeviceManager } from '../services/DeviceManager';
-import { logError, logInfo } from '../config/logger';
+import logger, { logError, logInfo } from '../config/logger';
 import QRCode from 'qrcode';
 
 const deviceManager = DeviceManager.getInstance();
@@ -39,7 +39,7 @@ export class DeviceController {
    */
   public static async listDevices(req: Request, res: Response): Promise<void> {
     try {
-      logInfo('Listing all devices');
+      logger.debug('Listing all devices');
       const devices = await deviceManager.listDevices();
       
       res.json({
@@ -67,7 +67,7 @@ export class DeviceController {
   public static async getDeviceStatus(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      logInfo(`Getting status for device ${id}`);
+      logger.debug(`Getting status for device ${id}`);
       
       const device = deviceManager.getDevice(id);
       if (!device) {
@@ -156,7 +156,7 @@ export class DeviceController {
   public static async getDevice(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      logInfo(`Getting device ${id}`);
+      logger.debug(`Getting device ${id}`);
       
       const device = deviceManager.getDevice(id);
       if (!device) {

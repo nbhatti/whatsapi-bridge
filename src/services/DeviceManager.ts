@@ -1,7 +1,7 @@
 
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import { getRedisClient } from '../config/redis';
-import { logError, logInfo } from '../config/logger';
+import logger, { logError, logInfo } from '../config/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { Redis } from 'ioredis';
 import {
@@ -256,7 +256,8 @@ export class DeviceManager {
         });
 
         client.on('message', (message) => {
-            logInfo(`Message received on device ${id}: ${message.body}`);
+            // Log message reception at debug level to reduce noise
+            logger.debug(`Message received on device ${id} from ${message.from}: ${message.body?.substring(0, 100)}${message.body?.length > 100 ? '...' : ''}`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitMessage(id, message);
