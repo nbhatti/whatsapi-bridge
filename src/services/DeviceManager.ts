@@ -57,6 +57,8 @@ export interface Device {
     client: Client;
     status: 'initializing' | 'qr' | 'ready' | 'disconnected' | 'error';
     qrCode?: string;
+    phoneNumber?: string;
+    clientName?: string;
     createdAt: number;
     lastSeen: number;
 }
@@ -71,6 +73,20 @@ export class DeviceManager {
         this.devices = new Map();
         this.redisClient = getRedisClient();
         this.redisStore = new RedisStore(this.redisClient);
+    }
+
+    /**
+     * Helper function to format device display ID with phone number and name
+     */
+    private getDeviceDisplayId(device: Device): string {
+        if (device.phoneNumber && device.clientName) {
+            return `${device.id} (${device.phoneNumber} - ${device.clientName})`;
+        } else if (device.phoneNumber) {
+            return `${device.id} (${device.phoneNumber})`;
+        } else if (device.clientName) {
+            return `${device.id} (${device.clientName})`;
+        }
+        return device.id;
     }
 
     public static getInstance(): DeviceManager {
@@ -154,12 +170,22 @@ export class DeviceManager {
         const devices: Partial<Device>[] = [];
         for (const id of deviceIds) {
             const deviceData = await this.redisClient.hgetall(`${DEVICE_KEY_PREFIX}${id}`);
-            devices.push({
+            const device: Partial<Device> = {
                 id,
                 status: deviceData.status as Device['status'],
                 createdAt: parseInt(deviceData.createdAt),
                 lastSeen: parseInt(deviceData.lastSeen),
-            });
+            };
+            
+            // Include phone number and name if they exist
+            if (deviceData.phoneNumber) {
+                device.phoneNumber = deviceData.phoneNumber;
+            }
+            if (deviceData.clientName) {
+                device.clientName = deviceData.clientName;
+            }
+            
+            devices.push(device);
         }
         return devices;
     }
@@ -198,6 +224,8 @@ export class DeviceManager {
                     status: 'initializing', // Will update when client connects
                     createdAt: parseInt(deviceData.createdAt),
                     lastSeen: parseInt(deviceData.lastSeen),
+                    phoneNumber: deviceData.phoneNumber || undefined,
+                    clientName: deviceData.clientName || undefined,
                 };
 
                 this.devices.set(deviceId, device);
@@ -205,13 +233,13 @@ export class DeviceManager {
 
                 // Initialize the client
                 client.initialize().catch(err => {
-                    logError(`Failed to restore device ${deviceId}`, err);
+                    logError(`Failed to restore device ${this.getDeviceDisplayId(device)}`, err);
                     device.status = 'error';
                     this.updateDeviceInRedis(device);
                     emitDeviceState(deviceId, 'error');
                 });
 
-                logInfo(`Device ${deviceId} restoration initiated`);
+                logInfo(`Device ${this.getDeviceDisplayId(device)} restoration initiated`);
             } catch (err: any) {
                 logError(`Error restoring device ${deviceId}:`, err);
             }
@@ -222,7 +250,7 @@ export class DeviceManager {
         const { client, id } = device;
 
         client.on('qr', (qr) => {
-            logInfo(`QR code for device ${id}: ${qr}`);
+            logInfo(`QR code for device ${this.getDeviceDisplayId(device)}: ${qr}`);
             device.status = 'qr';
             device.qrCode = qr;
             device.lastSeen = Date.now();
@@ -230,16 +258,33 @@ export class DeviceManager {
             emitQRCode(id, qr);
         });
 
-        client.on('ready', () => {
-            logInfo(`Device ${id} is ready`);
-            device.status = 'ready';
-            device.lastSeen = Date.now();
-            this.updateDeviceInRedis(device);
-            emitDeviceReady(id);
+        client.on('ready', async () => {
+            try {
+                // Extract phone number and name when device is ready
+                const clientInfo = client.info;
+                const phoneNumber = (clientInfo as any)?.wid?.user;
+                const clientName = (clientInfo as any)?.pushname || (clientInfo as any)?.me?.name;
+                
+                device.phoneNumber = phoneNumber || undefined;
+                device.clientName = clientName || undefined;
+                
+                logInfo(`Device ${this.getDeviceDisplayId(device)} is ready`);
+                device.status = 'ready';
+                device.lastSeen = Date.now();
+                await this.updateDeviceInRedis(device);
+                emitDeviceReady(id);
+            } catch (err) {
+                logError(`Error extracting device info for ${id}`, err);
+                logInfo(`Device ${id} is ready`);
+                device.status = 'ready';
+                device.lastSeen = Date.now();
+                await this.updateDeviceInRedis(device);
+                emitDeviceReady(id);
+            }
         });
 
         client.on('authenticated', () => {
-            logInfo(`Device ${id} is authenticated`);
+            logInfo(`Device ${this.getDeviceDisplayId(device)} is authenticated`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             
@@ -250,21 +295,21 @@ export class DeviceManager {
                 const clientName = (clientInfo as any)?.pushname || 'WhatsApp Client';
                 emitDeviceAuthenticated(id, phoneNumber, clientName);
             } catch (err: any) {
-                logError(`Failed to get client info for device ${id}`, err);
+                logError(`Failed to get client info for device ${this.getDeviceDisplayId(device)}`, err);
                 emitDeviceAuthenticated(id, 'unknown', 'WhatsApp Client');
             }
         });
 
         client.on('message', (message) => {
             // Log message reception at debug level to reduce noise
-            logger.debug(`Message received on device ${id} from ${message.from}: ${message.body?.substring(0, 100)}${message.body?.length > 100 ? '...' : ''}`);
+            logger.debug(`Message received on device ${this.getDeviceDisplayId(device)} from ${message.from}: ${message.body?.substring(0, 100)}${message.body?.length > 100 ? '...' : ''}`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitMessage(id, message);
         });
 
         client.on('disconnected', (reason) => {
-            logInfo(`Device ${id} disconnected: ${reason}`);
+            logInfo(`Device ${this.getDeviceDisplayId(device)} disconnected: ${reason}`);
             device.status = 'disconnected';
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
@@ -272,7 +317,7 @@ export class DeviceManager {
         });
 
         client.on('change_state', (state) => {
-            logInfo(`Device ${id} state changed: ${state}`);
+            logInfo(`Device ${this.getDeviceDisplayId(device)} state changed: ${state}`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitDeviceState(id, state);
@@ -280,12 +325,22 @@ export class DeviceManager {
     }
 
     private async updateDeviceInRedis(device: Device): Promise<void> {
-        await this.redisClient.hset(`${DEVICE_KEY_PREFIX}${device.id}`, {
+        const deviceData: any = {
             id: device.id,
             status: device.status,
             createdAt: device.createdAt.toString(),
             lastSeen: device.lastSeen.toString(),
-        });
+        };
+        
+        // Only include phone number and name if they exist
+        if (device.phoneNumber) {
+            deviceData.phoneNumber = device.phoneNumber;
+        }
+        if (device.clientName) {
+            deviceData.clientName = device.clientName;
+        }
+        
+        await this.redisClient.hset(`${DEVICE_KEY_PREFIX}${device.id}`, deviceData);
     }
 }
 

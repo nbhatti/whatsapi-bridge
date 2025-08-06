@@ -85,7 +85,7 @@ router.use('/:id/groups', groupRoutes);
  * @swagger
  * /api/v1/devices/{id}/contacts:
  *   post:
- *     summary: Get contacts for a device
+ *     summary: Get contacts for a device with optional filtering
  *     tags: [Devices, Contacts]
  *     parameters:
  *       - in: path

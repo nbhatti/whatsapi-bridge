@@ -22,6 +22,8 @@ export class DeviceController {
           status: device.status,
           createdAt: device.createdAt,
           lastSeen: device.lastSeen,
+          phoneNumber: device.phoneNumber || null,
+          clientName: device.clientName || null,
         },
       });
     } catch (error) {
@@ -49,6 +51,8 @@ export class DeviceController {
           status: device.status,
           createdAt: device.createdAt,
           lastSeen: device.lastSeen,
+          phoneNumber: device.phoneNumber || null,
+          clientName: device.clientName || null,
         })),
       });
     } catch (error) {
@@ -82,6 +86,8 @@ export class DeviceController {
         deviceId: device.id,
         status: device.status,
         lastSeen: device.lastSeen,
+        phoneNumber: device.phoneNumber || null,
+        clientName: device.clientName || null,
       };
 
       // If device is waiting for QR scan, include QR data URL
@@ -174,6 +180,8 @@ export class DeviceController {
           status: device.status,
           createdAt: device.createdAt,
           lastSeen: device.lastSeen,
+          phoneNumber: device.phoneNumber || null,
+          clientName: device.clientName || null,
           qrCode: device.qrCode,
         },
       });

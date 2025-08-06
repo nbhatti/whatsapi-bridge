@@ -91,6 +91,7 @@ export const schemas = {
     filter: Joi.string().valid('all', 'unread', 'groups', 'private', 'archived').default('all'),
     limit: Joi.number().integer().min(1).max(100).default(20),
     summary: Joi.boolean().default(true),
+    search: Joi.string().optional().min(1).max(100),
   }),
 
   fetchChatMessages: Joi.object({
