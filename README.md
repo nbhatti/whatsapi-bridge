@@ -141,9 +141,6 @@ npm run redis:up
 
 # Stop Redis
 npm run redis:down
-
-# Test Redis connection
-npm run test:redis
 ```
 
 Alternatively, you can use Docker commands directly:
