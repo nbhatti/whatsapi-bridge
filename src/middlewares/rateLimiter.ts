@@ -19,6 +19,12 @@ export interface RateLimiterConfig {
 }
 
 /**
+ * Redis connection status tracking
+ */
+let redisWarningLogged = false;
+let redisReadyLogged = false;
+
+/**
  * Creates a Redis store for rate limiting
  * 
  * @param keyPrefix - Prefix for Redis keys
@@ -33,8 +39,18 @@ const createRedisStore = (keyPrefix: string = 'rl') => {
         try {
           // Check if Redis client is ready
           if (redisClient.status !== 'ready') {
-            logWarn('Redis client is not ready for rate limiting, falling back to memory store');
+            // Only log warning once to avoid spam
+            if (!redisWarningLogged) {
+              logWarn('Redis client is not ready for rate limiting, using memory store fallback');
+              redisWarningLogged = true;
+            }
             return Promise.resolve('') as any;
+          } else {
+            // Log when Redis becomes ready (only once)
+            if (!redisReadyLogged) {
+              logger.info('Rate limiting now using Redis store');
+              redisReadyLogged = true;
+            }
           }
           return redisClient.sendCommand(args as any);
         } catch (error) {
