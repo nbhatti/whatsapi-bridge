@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Message, MessageMedia } from 'whatsapp-web.js';
+import { Message, MessageMedia, Location } from 'whatsapp-web.js';
 import { DeviceManager } from '../services/DeviceManager';
 import { logger } from '../config';
 
@@ -21,8 +21,50 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { summary, filter, limit } = req.query;
-    const chats = await device.client.getChats();
+    const { summary, filter, limit, search } = req.query;
+    let chats = await device.client.getChats();
+    
+    // Apply search filter if provided
+    if (search && typeof search === 'string') {
+      const searchLower = search.toLowerCase();
+      chats = chats.filter(chat => {
+        // Search by name
+        const name = (chat.name || chat.id.user || '').toLowerCase();
+        if (name.includes(searchLower)) return true;
+        
+        // Search by phone number (for individual chats)
+        if (!chat.isGroup && chat.id.user && chat.id.user.includes(search)) return true;
+        
+        // Search in last message body
+        if (chat.lastMessage?.body && chat.lastMessage.body.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+        
+        return false;
+      });
+    }
+    
+    // Apply filter
+    if (filter && typeof filter === 'string') {
+      switch (filter) {
+        case 'unread':
+          chats = chats.filter(chat => chat.unreadCount > 0);
+          break;
+        case 'groups':
+          chats = chats.filter(chat => chat.isGroup);
+          break;
+        case 'private':
+          chats = chats.filter(chat => !chat.isGroup);
+          break;
+        case 'archived':
+          chats = chats.filter(chat => chat.archived);
+          break;
+        case 'all':
+        default:
+          // No additional filtering
+          break;
+      }
+    }
     
     if (summary) {
       // Return summary format with just essential info
@@ -47,11 +89,27 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
         success: true, 
         data: chatSummary,
         total: chats.length,
-        returned: chatSummary.length
+        returned: chatSummary.length,
+        filters: {
+          search: search || null,
+          filter: filter || 'all'
+        }
       });
     } else {
       // Return full chat objects
-      res.json({ success: true, data: chats });
+      const limitNumber = typeof limit === 'string' ? parseInt(limit) : undefined;
+      const limitedChats = limitNumber ? chats.slice(0, limitNumber) : chats;
+      
+      res.json({ 
+        success: true, 
+        data: limitedChats,
+        total: chats.length,
+        returned: limitedChats.length,
+        filters: {
+          search: search || null,
+          filter: filter || 'all'
+        }
+      });
     }
   } catch (error) {
     logger.error('Error listing chats:', error);
@@ -131,7 +189,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const { to, text, media, quotedMessageId, mentions } = req.body;
+    const { to, text, media, quotedMessageId, mentions, location } = req.body;
     
     // Build message options
     const messageOptions: any = {};
@@ -154,7 +212,12 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     }
     
     let message;
-    if (media) {
+    
+    // Handle location messages
+    if (location && location.latitude && location.longitude) {
+      const locationMessage = new Location(location.latitude, location.longitude, location.description || '');
+      message = await device.client.sendMessage(to, locationMessage, messageOptions);
+    } else if (media) {
       const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
       message = await device.client.sendMessage(to, messageMedia, { 
         caption: text,
@@ -168,6 +231,66 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
   } catch (error) {
     logger.error('Error sending message:', error);
     res.status(500).json({ success: false, error: 'Failed to send message' });
+  }
+};
+
+/**
+ * Send location message
+ */
+export const sendLocation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceManager = DeviceManager.getInstance();
+    const device = deviceManager.getDevice(req.params.id);
+    if (!device) {
+      res.status(404).json({ success: false, error: 'Device not found' });
+      return;
+    }
+
+    if (device.status !== 'ready') {
+      res.status(400).json({ 
+        success: false, 
+        error: `Device is not ready. Current status: ${device.status}`,
+        currentStatus: device.status
+      });
+      return;
+    }
+
+    const { to, latitude, longitude, description } = req.body;
+    
+    // Validate coordinates
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid coordinates. Latitude and longitude must be numbers.' 
+      });
+      return;
+    }
+    
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.' 
+      });
+      return;
+    }
+    
+    const location = new Location(latitude, longitude, description || '');
+    const message = await device.client.sendMessage(to, location);
+    
+    res.json({ 
+      success: true, 
+      data: {
+        ...message,
+        location: {
+          latitude,
+          longitude,
+          description: description || null
+        }
+      } 
+    });
+  } catch (error) {
+    logger.error('Error sending location:', error);
+    res.status(500).json({ success: false, error: 'Failed to send location' });
   }
 };
 

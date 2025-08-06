@@ -39,6 +39,11 @@ const router = Router({ mergeParams: true });
  *           type: boolean
  *           default: false
  *         description: Return chat summary (ID, name, last message) instead of full chat objects
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search chats by name, phone number, or last message content
  *     responses:
  *       200:
  *         description: List of chats retrieved successfully
@@ -109,6 +114,21 @@ router.get('/', validate(schemas.listChats, 'query'), ChatController.listChats);
  *                 items:
  *                   type: string
  *                 description: Array of phone numbers to mention
+ *               location:
+ *                 type: object
+ *                 properties:
+ *                   latitude:
+ *                     type: number
+ *                     example: 40.7128
+ *                     description: Latitude coordinate
+ *                   longitude:
+ *                     type: number
+ *                     example: -74.0060
+ *                     description: Longitude coordinate
+ *                   description:
+ *                     type: string
+ *                     example: "New York City"
+ *                     description: Optional location description
  *     responses:
  *       200:
  *         description: Message sent successfully
@@ -426,6 +446,61 @@ router.post('/:chatId/messages/delete',
   validate(schemas.deleteMessage, 'body'),
   ChatController.deleteMessage
 );
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/chats/location:
+ *   post:
+ *     summary: Send location message
+ *     tags: [Chats, Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - to
+ *               - latitude
+ *               - longitude
+ *             properties:
+ *               to:
+ *                 type: string
+ *                 description: Chat ID or phone number
+ *               latitude:
+ *                 type: number
+ *                 example: 40.7128
+ *                 minimum: -90
+ *                 maximum: 90
+ *                 description: Latitude coordinate (-90 to 90)
+ *               longitude:
+ *                 type: number
+ *                 example: -74.0060
+ *                 minimum: -180
+ *                 maximum: 180
+ *                 description: Longitude coordinate (-180 to 180)
+ *               description:
+ *                 type: string
+ *                 example: "Times Square, New York"
+ *                 description: Optional location description
+ *     responses:
+ *       200:
+ *         description: Location message sent successfully
+ *       400:
+ *         description: Invalid coordinates or request data
+ *       404:
+ *         description: Device not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/location', ChatController.sendLocation);
 
 /**
  * @swagger
