@@ -39,7 +39,7 @@ For **critical security vulnerabilities** that could potentially:
 ### Secure Reporting Channels
 
 **Primary Contact:**
-- 📧 **Email:** [security@ylinx.pk](mailto:security@ylinx.pk)
+- 📧 **Email:** [soc@ylinx.pk](mailto:soc@ylinx.pk)
 - 🔐 **Encryption:** PGP key available upon request
 
 **Alternative Contact:**
@@ -259,13 +259,13 @@ While we don't currently offer a formal bug bounty program, we:
 
 **yLinx Security Team**
 
-- 🔒 **Primary:** [security@ylinx.pk](mailto:security@ylinx.pk)
+- 🔒 **Primary:** [soc@ylinx.pk](mailto:soc@ylinx.pk)
 - 👤 **Lead:** Muhammad Naseer Bhatti ([naseer@ylinx.pk](mailto:naseer@ylinx.pk))
 - 🌐 **Company:** [https://ylinx.pk](https://ylinx.pk)
 - 📍 **Address:** 71-B1 Johar Town, Lahore, Pakistan
 - ☎️ **Phone:** +92 423 222 7788
 
-**Business Hours:** Sunday - Thursday, 9 AM - 6 PM (PKT)
+**Business Hours:** Monday - Friday, 9 AM - 6 PM (PKT)
 **Emergency Response:** Available 24/7 for critical security issues
 
 ---
@@ -274,7 +274,7 @@ While we don't currently offer a formal bug bounty program, we:
 
 We appreciate your help in keeping WhatsAPI Bridge secure. Your responsible disclosure helps protect our users and the broader community.
 
-For questions about this security policy, please contact [security@ylinx.pk](mailto:security@ylinx.pk).
+For questions about this security policy, please contact [soc@ylinx.pk](mailto:soc@ylinx.pk).
 
 ---
 
