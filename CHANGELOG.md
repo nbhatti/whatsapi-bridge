@@ -55,7 +55,8 @@ This is the first stable release of WhatsAPI Bridge - Enterprise-grade WhatsApp 
 ### 🔧 Technical Specifications
 
 #### Dependencies
-- **Node.js** >= 16.0.0
+- **Node.js** >= 22.0.0 (Latest LTS recommended)
+- **npm** >= 10.0.0 for package management
 - **Express.js** 5.1.0 for web server
 - **WhatsApp-web.js** 1.31.0 for WhatsApp integration  
 - **Redis** for session storage and caching

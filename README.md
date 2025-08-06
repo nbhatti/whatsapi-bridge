@@ -1,7 +1,7 @@
 # 🚀 WhatsAPI Bridge
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)](https://www.typescriptlang.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-5.1.0-lightgrey)](https://expressjs.com/)
 [![WhatsApp Web.js](https://img.shields.io/badge/WhatsApp%20Web.js-1.31.0-25D366)](https://wwebjs.dev/)
@@ -94,7 +94,8 @@ These instructions will get you a copy of WhatsAPI Bridge up and running on your
 
 ### Prerequisites
 
-* Node.js (v16 or higher)
+* Node.js (v22 or higher) - LTS recommended
+* npm (v10 or higher)
 * Docker (for running Redis)
 
 ### Installing

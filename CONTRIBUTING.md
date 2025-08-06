@@ -38,8 +38,8 @@ This project and everyone participating in it is governed by our commitment to c
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
-- npm (v7 or higher)
+- Node.js (v22 or higher) - LTS recommended
+- npm (v10 or higher)
 - Git
 - Docker (for Redis and containerization)
 - A code editor (VS Code recommended)
