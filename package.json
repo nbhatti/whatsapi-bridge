@@ -1,8 +1,16 @@
 {
-  "name": "server",
+  "name": "whatsapi-bridge",
   "version": "1.0.0",
-  "description": "TypeScript Express REST API Server",
+  "description": "Enterprise-grade WhatsApp Web.js REST API Bridge with AI capabilities, TypeScript, Redis, and Socket.IO support for seamless messaging automation",
   "main": "dist/index.js",
+  "homepage": "https://github.com/nbhatti/whatsapi-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nbhatti/whatsapi-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nbhatti/whatsapi-bridge/issues"
+  },
   "scripts": {
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
@@ -26,11 +34,56 @@
     "docker:dev": "docker-compose -f docker-compose.dev.yml up",
     "docker:dev:build": "docker-compose -f docker-compose.dev.yml build",
     "redis:up": "docker-compose up redis -d",
-    "redis:down": "docker-compose down redis"
+    "redis:down": "docker-compose down redis",
+    "security:audit": "npm audit",
+    "security:fix": "npm audit fix",
+    "security:check": "npm run lint && npm audit && npm run build",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "version:prerelease": "npm version prerelease",
+    "release:patch": "npm run build && npm run test && npm version patch && git push --follow-tags",
+    "release:minor": "npm run build && npm run test && npm version minor && git push --follow-tags",
+    "release:major": "npm run build && npm run test && npm version major && git push --follow-tags",
+    "changelog": "git log --oneline --decorate --graph",
+    "prepare:release": "npm run clean && npm run build && npm run test && npm run security:check"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "whatsapp",
+    "api",
+    "bridge",
+    "rest",
+    "typescript",
+    "express",
+    "websocket",
+    "redis",
+    "messaging",
+    "ai",
+    "automation",
+    "whatsapp-web",
+    "chat-api",
+    "socket-io",
+    "enterprise",
+    "business-messaging",
+    "open-source"
+  ],
+  "author": {
+    "name": "Muhammad Naseer Bhatti",
+    "email": "naseer@ylinx.pk",
+    "url": "https://ylinx.pk"
+  },
+  "contributors": [
+    {
+      "name": "yLinx",
+      "email": "naseer@ylinx.pk",
+      "url": "https://ylinx.pk"
+    }
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
   "type": "commonjs",
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
