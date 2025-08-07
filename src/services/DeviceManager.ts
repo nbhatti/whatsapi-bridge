@@ -210,10 +210,15 @@ export class DeviceManager {
     }
 
     public async restoreDevicesFromRedis(): Promise<void> {
-        logInfo('Restoring devices from Redis...');
+        logInfo('Initiating device restoration from Redis storage...');
         const deviceIds = await this.redisClient.smembers(DEVICES_SET_KEY);
         
-        logInfo(`Found ${deviceIds.length} devices to restore`);
+        if (deviceIds.length === 0) {
+            logInfo('No devices found in Redis - starting with clean state');
+            return;
+        }
+        
+        logInfo(`Device restoration process starting: found ${deviceIds.length} device(s) to restore`);
         
         for (const deviceId of deviceIds) {
             try {
@@ -258,7 +263,7 @@ export class DeviceManager {
                     emitDeviceState(deviceId, 'error');
                 });
 
-                logInfo(`Device ${this.getDeviceDisplayId(device)} restoration initiated`);
+        logInfo(`Device restoration initiated for ${this.getDeviceDisplayId(device)}`);
             } catch (err: any) {
                 logError(`Error restoring device ${deviceId}:`, err);
             }
@@ -295,7 +300,7 @@ export class DeviceManager {
                 device.phoneNumber = phoneNumber || undefined;
                 device.clientName = clientName || undefined;
                 
-                logInfo(`Device ${this.getDeviceDisplayId(device)} is ready`);
+                logInfo(`Device ${this.getDeviceDisplayId(device)} connection established and ready for messaging`);
                 device.status = 'ready';
                 device.lastSeen = Date.now();
                 await this.updateDeviceInRedis(device);
@@ -333,7 +338,7 @@ export class DeviceManager {
         });
 
         client.on('authenticated', async () => {
-            logInfo(`Device ${this.getDeviceDisplayId(device)} is authenticated`);
+            logInfo(`Device authentication successful for ${this.getDeviceDisplayId(device)}`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             
@@ -404,7 +409,7 @@ export class DeviceManager {
         });
 
         client.on('disconnected', async (reason) => {
-            logInfo(`Device ${this.getDeviceDisplayId(device)} disconnected: ${reason}`);
+            logInfo(`Device disconnection detected for ${this.getDeviceDisplayId(device)} | Reason: ${reason}`);
             device.status = 'disconnected';
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
@@ -420,7 +425,7 @@ export class DeviceManager {
         });
 
         client.on('change_state', (state) => {
-            logInfo(`Device ${this.getDeviceDisplayId(device)} state changed: ${state}`);
+            logInfo(`Device state change detected for ${this.getDeviceDisplayId(device)} | New state: ${state}`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitDeviceState(id, state);
@@ -433,7 +438,7 @@ export class DeviceManager {
      */
     private async cacheExistingMessages(device: Device): Promise<void> {
         try {
-            logInfo(`Caching existing messages for device ${this.getDeviceDisplayId(device)}`);
+            logInfo(`Initiating message cache population for device ${this.getDeviceDisplayId(device)}`);
             
             // Get recent chats (limit to 10 most recent to avoid overwhelming)
             const chats = await device.client.getChats();
@@ -477,7 +482,7 @@ export class DeviceManager {
                 }
             }
             
-            logInfo(`Cached ${totalInbound} inbound and ${totalOutbound} outbound existing messages for device ${this.getDeviceDisplayId(device)}`);
+            logInfo(`Message cache population completed for device ${this.getDeviceDisplayId(device)} | Cached: ${totalInbound} inbound, ${totalOutbound} outbound messages`);
         } catch (error) {
             logError(`Failed to cache existing messages for device ${this.getDeviceDisplayId(device)}`, error);
         }

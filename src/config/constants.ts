@@ -52,3 +52,12 @@ export const TIME = {
   DAY: 24 * 60 * 60 * 1000,
   WEEK: 7 * 24 * 60 * 60 * 1000,
 } as const;
+
+// Analytics defaults
+export const ANALYTICS_DEFAULTS = {
+  UNREAD_DETECTIVE_LIMIT: parseInt(process.env.ANALYTICS_UNREAD_LIMIT || '20'),
+  CHATTERBOXES_LIMIT: parseInt(process.env.ANALYTICS_CHATTERBOX_LIMIT || '10'),
+  TIME_RANGE_DAYS: parseInt(process.env.ANALYTICS_DEFAULT_DAYS || '30'),
+  HEALTH_CHECK_LIMIT: parseInt(process.env.ANALYTICS_HEALTH_CHECK_LIMIT || '20'),
+  CONVERSATION_ARCHAEOLOGY_LIMIT: parseInt(process.env.ANALYTICS_ARCHAEOLOGY_LIMIT || '25'),
+} as const;

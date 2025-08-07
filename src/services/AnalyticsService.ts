@@ -2,6 +2,7 @@ import { getRedisClient } from '../config/redis';
 import { DeviceManager } from './DeviceManager';
 import { AIService } from './AIService';
 import { logger } from '../config';
+import { ANALYTICS_DEFAULTS } from '../config/constants';
 import { Redis } from 'ioredis';
 import { Chat, Message } from 'whatsapp-web.js';
 
@@ -277,7 +278,7 @@ export class AnalyticsService {
   /**
    * Get detailed unread messages analysis
    */
-  async getUnreadAnalysis(deviceId: string): Promise<{
+  async getUnreadAnalysis(deviceId: string, limit: number = 20): Promise<{
     summary: {
       totalUnreadChats: number;
       totalUnreadMessages: number;
@@ -341,7 +342,7 @@ export class AnalyticsService {
       });
     }
 
-    // Sort by priority and recency
+    // Sort by priority and recency, then limit results
     unreadAnalysis.sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
@@ -349,8 +350,11 @@ export class AnalyticsService {
       }
       return (b.lastMessageTime || 0) - (a.lastMessageTime || 0);
     });
+    
+    // Apply limit to results while preserving summary stats for all unread chats
+    const limitedUnreadAnalysis = unreadAnalysis.slice(0, limit);
 
-    const recommendations = await this.generateUnreadRecommendations(unreadAnalysis);
+    const recommendations = await this.generateUnreadRecommendations(limitedUnreadAnalysis);
 
     return {
       summary: {
@@ -358,8 +362,10 @@ export class AnalyticsService {
         totalUnreadMessages: unreadChats.reduce((sum, chat) => sum + chat.unreadCount, 0),
         oldestUnreadDays: oldestUnreadDays === 0 ? 0 : oldestUnreadDays,
         priorityContacts: unreadAnalysis.filter(chat => chat.priority === 'high').length,
+        displayedChats: limitedUnreadAnalysis.length,
+        limitApplied: limit < unreadAnalysis.length,
       },
-      unreadChats: unreadAnalysis,
+      unreadChats: limitedUnreadAnalysis,
       recommendations,
     };
   }
@@ -392,7 +398,7 @@ export class AnalyticsService {
     const cutoffTime = Date.now() - (timeRange * 24 * 60 * 60 * 1000);
     const relationshipInsights = [];
 
-    for (const chat of chats.slice(0, 20)) { // Analyze top 20 active chats
+    for (const chat of chats.slice(0, ANALYTICS_DEFAULTS.HEALTH_CHECK_LIMIT)) { // Analyze configurable number of active chats
       const analytics = await this.analyzeChatDetailed(deviceId, chat, cutoffTime);
       if (!analytics || analytics.totalMessages < 5) continue;
 

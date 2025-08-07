@@ -285,7 +285,7 @@ export class MessageQueueService {
       await this.redisClient.set(`${this.DEVICE_LAST_MESSAGE_KEY}:${message.deviceId}`, Date.now().toString());
       await this.incrementDeviceMessageCount(message.deviceId);
 
-      logInfo(`Message sent successfully: ${message.id} to ${message.to} from device ${this.deviceManager.getFormattedDeviceId(message.deviceId)}`);
+      logInfo(`Message sent successfully: ${message.id} to ${message.to} from device ${this.deviceManager.getFormattedDeviceId(message.deviceId)} | Type: ${message.type} | Content: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`);
       
     } catch (error: any) {
       logError(`Failed to send message ${message.id} to ${message.to}:`, {

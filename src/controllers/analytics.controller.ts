@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AnalyticsService } from '../services/AnalyticsService';
 import { DeviceManager } from '../services/DeviceManager';
 import { logger } from '../config';
+import { ANALYTICS_DEFAULTS } from '../config/constants';
 
 const analyticsService = new AnalyticsService();
 const deviceManager = DeviceManager.getInstance();
@@ -49,7 +50,10 @@ export const getDashboard = async (req: Request, res: Response): Promise<void> =
 export const getUnreadDetective = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const unreadAnalysis = await analyticsService.getUnreadAnalysis(id);
+    const { limit = ANALYTICS_DEFAULTS.UNREAD_DETECTIVE_LIMIT } = req.query;
+    
+    const parsedLimit = Math.min(Math.max(parseInt(limit as string) || ANALYTICS_DEFAULTS.UNREAD_DETECTIVE_LIMIT, 1), 50);
+    const unreadAnalysis = await analyticsService.getUnreadAnalysis(id, parsedLimit);
 
     res.json({
       success: true,

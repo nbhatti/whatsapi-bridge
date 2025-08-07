@@ -48,7 +48,8 @@ initializeRedis().then(async () => {
     // Restore devices from Redis after services are ready
     const deviceManager = DeviceManager.getInstance();
     await deviceManager.restoreDevicesFromRedis();
-    logger.info('Device restoration completed');
+    const restoredDevices = deviceManager.getAllDevices();
+    logger.info(`Device restoration completed: ${restoredDevices.length} device(s) restored from Redis`);
     
   } catch (error) {
     logger.error('Failed to initialize blocking prevention services or restore devices:', error);

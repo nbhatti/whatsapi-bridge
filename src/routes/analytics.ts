@@ -92,6 +92,14 @@ router.get('/dashboard', AnalyticsController.getDashboard);
  *         schema:
  *           type: string
  *         description: Device ID
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 50
+ *         description: Maximum number of unread chats to analyze (configurable via ANALYTICS_UNREAD_LIMIT env var)
  *     responses:
  *       200:
  *         description: Unread messages detective report
