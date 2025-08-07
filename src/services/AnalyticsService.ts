@@ -97,9 +97,9 @@ export class AnalyticsService {
   private redisClient: Redis;
   private deviceManager: DeviceManager;
   private aiService: AIService;
-  private static readonly ANALYTICS_PREFIX = 'analytics:';
-  private static readonly MESSAGE_HISTORY_PREFIX = 'msg_history:';
-  private static readonly CHAT_STATS_PREFIX = 'chat_stats:';
+  private static readonly ANALYTICS_PREFIX = 'whatsapp:analytics:';
+  private static readonly MESSAGE_HISTORY_PREFIX = 'whatsapp:msg_history:';
+  private static readonly CHAT_STATS_PREFIX = 'whatsapp:chat_stats:';
 
   constructor() {
     this.redisClient = getRedisClient();
