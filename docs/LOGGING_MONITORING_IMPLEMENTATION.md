@@ -2,7 +2,7 @@
 
 This document summarizes the logging and monitoring features that have been implemented for the WhatsApp API server.
 
-## ✅ Features Implemented
+## Features Implemented
 
 ### 1. Winston Transports: Console + Rotating File
 
@@ -67,7 +67,7 @@ A comprehensive health check endpoint that verifies system status and returns up
 - `200 OK`: All systems operational
 - `503 Service Unavailable`: One or more systems degraded/failed
 
-## 📁 Log Files Structure
+## Log Files Structure
 
 ```
 logs/
@@ -77,7 +77,7 @@ logs/
 └── .audit files               # Winston rotation metadata
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -101,7 +101,7 @@ REDIS_URL=redis://localhost:6379
 - `http`: HTTP request logs
 - `debug`: Debug messages (development only)
 
-## 🚀 Usage Examples
+## Usage Examples
 
 ### Using the Logger
 
@@ -128,7 +128,7 @@ The health check endpoint is automatically available at `/health` and can be use
 - **DevOps tools**: For automated health verification
 - **Docker**: As a health check in container orchestration
 
-## 📊 Log Rotation & Cleanup
+## Log Rotation & Cleanup
 
 - **Automatic Rotation**: Files rotate daily at midnight
 - **Size-based Rotation**: Files rotate when they exceed 20MB
@@ -136,7 +136,7 @@ The health check endpoint is automatically available at `/health` and can be use
 - **Compression**: Old logs are automatically gzipped
 - **Audit Trail**: Winston maintains audit files for rotation tracking
 
-## 🔍 Monitoring Best Practices
+## Monitoring Best Practices
 
 1. **Log Levels**: Use appropriate log levels for different scenarios
 2. **Structured Logging**: Logs are in JSON format for easy parsing

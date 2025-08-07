@@ -47,10 +47,6 @@ const swaggerDefinition = {
       description: 'Endpoints for managing WhatsApp devices (sessions).',
     },
     {
-      name: 'Examples',
-      description: 'Example endpoints demonstrating various features.',
-    },
-    {
       name: 'Future',
       description: 'Future and experimental endpoints under development.',
     },

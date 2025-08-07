@@ -2,7 +2,7 @@
 
 This directory contains comprehensive documentation for the WhatsApp Web.js REST API Wrapper project, organized alphabetically.
 
-## 📚 Documentation Files (A-Z)
+## Documentation Files (A-Z)
 
 ### [ai-analysis-examples.md](./ai-analysis-examples.md)
 Complete examples and usage patterns for AI-powered chat analysis features, including multi-provider support and custom queries.
@@ -30,13 +30,13 @@ WebSocket implementation guide for real-time communication features and event-dr
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 1. Begin with [ARCHITECTURE.md](./ARCHITECTURE.md) for system overview
 2. Review API examples in [ai-analysis-examples.md](./ai-analysis-examples.md) and [chat-management-examples.md](./chat-management-examples.md)
 3. Check deployment options in [Docker.md](./Docker.md)
 4. Explore specific API routes in the relevant route documentation files
 
-## 🔧 Development
+## Development
 - All documentation is written in Markdown format
 - Files are organized alphabetically for easy navigation
 - Examples include curl commands and code snippets for popular languages

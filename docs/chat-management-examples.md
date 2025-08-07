@@ -113,7 +113,7 @@ curl -H "x-api-key: test-api-key-123" \
 
 ## Use Cases for Chat Summary
 
-### 📱 Mobile App Chat List
+### Mobile App Chat List
 Perfect for building WhatsApp-like chat interfaces:
 
 ```javascript
@@ -134,7 +134,7 @@ chats.data.forEach(chat => {
 });
 ```
 
-### 🔍 Chat Search and Filtering
+### Chat Search and Filtering
 Quick filtering without heavy data:
 
 ```bash
@@ -143,7 +143,7 @@ curl -H "x-api-key: test-api-key-123" \
   "http://localhost:3000/api/v1/devices/{DEVICE_ID}/chats?summary=true&filter=unread"
 ```
 
-### 📊 Analytics Dashboard
+### Analytics Dashboard
 Monitor chat activity:
 
 ```javascript
@@ -159,7 +159,7 @@ const analytics = {
 };
 ```
 
-### ⚡ Performance Benefits
+### Performance Benefits
 
 **Full Chat Response:** ~15KB per chat (includes all WhatsApp metadata)
 **Summary Response:** ~200 bytes per chat (essential info only)
@@ -249,7 +249,7 @@ function ChatList({ deviceId }) {
       {chats.map(chat => (
         <div key={chat.id} className="chat-item">
           <div className="chat-name">
-            {chat.name} {chat.isGroup && '👥'}
+            {chat.name} {chat.isGroup && '(Group)'}
           </div>
           <div className="last-message">{chat.lastMessage.body}</div>
           {chat.unreadCount > 0 && (

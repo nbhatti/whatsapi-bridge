@@ -22,6 +22,12 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Format phone number properly - ensure it has @c.us suffix
+    let formattedTo = to;
+    if (!to.includes('@')) {
+      formattedTo = `${to}@c.us`;
+    }
+
     const sendOptions: MessageSendOptions = {
       ...(quotedId && { quotedMessageId: quotedId }),
       ...(mentions && { mentions }),
@@ -29,19 +35,24 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
 
     let message;
     if (type === 'text' && text) {
-      message = await device.client.sendMessage(to, text, sendOptions);
+      message = await device.client.sendMessage(formattedTo, text, sendOptions);
     } else if (mediaBase64) {
       const media = new MessageMedia(type, mediaBase64);
-      message = await device.client.sendMessage(to, media, sendOptions);
+      message = await device.client.sendMessage(formattedTo, media, sendOptions);
     } else {
       res.status(400).json({ success: false, error: 'Invalid message type or missing content.' });
       return;
     }
 
     res.status(201).json({ success: true, data: message });
-  } catch (error) {
+  } catch (error: any) {
     logError('Error sending message:', error);
-    res.status(500).json({ success: false, error: 'Failed to send message.' });
+    logInfo(`Failed to send message to ${req.body.to}: ${error.message}`);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to send message.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

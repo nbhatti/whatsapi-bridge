@@ -131,6 +131,62 @@ export const schemas = {
     customQuery: Joi.string().min(10).max(1000).optional(),
   }),
 
+  // Unified Message Schemas
+  sendUnifiedMessage: Joi.object({
+    to: Joi.string().required(),
+    text: Joi.string().optional(),
+    media: Joi.object({
+      mimetype: Joi.string().required(),
+      data: Joi.string().required(),
+      filename: Joi.string().optional()
+    }).optional(),
+    location: Joi.object({
+      latitude: Joi.number().required(),
+      longitude: Joi.number().required(),
+      description: Joi.string().optional()
+    }).optional(),
+    quotedMessageId: Joi.string().optional(),
+    mentions: Joi.array().items(Joi.string()).optional()
+  }).or('text', 'media', 'location'),
+
+  forwardUnifiedMessage: Joi.object({
+    messageId: Joi.string().required(),
+    to: Joi.string().required(),
+    fromChatId: Joi.string().optional()
+  }),
+
+  deleteUnifiedMessage: Joi.object({
+    messageId: Joi.string().required(),
+    forEveryone: Joi.boolean().default(false),
+    fromChatId: Joi.string().optional()
+  }),
+
+  editUnifiedMessage: Joi.object({
+    messageId: Joi.string().required(),
+    newText: Joi.string().required().min(1).max(4096),
+    fromChatId: Joi.string().optional()
+  }),
+
+  // Mentions and Groups Schemas
+  mentionGroupMessage: Joi.object({
+    text: Joi.string().required().min(1).max(4096),
+    mentions: Joi.array().items(Joi.string()).optional(),
+    mentionAll: Joi.boolean().default(false)
+  }),
+
+  mentionMessage: Joi.object({
+    to: Joi.string().required(),
+    text: Joi.string().required().min(1).max(4096),
+    mentions: Joi.array().items(Joi.string()).optional(),
+    quotedMessageId: Joi.string().optional(),
+    media: Joi.object({
+      mimetype: Joi.string().required(),
+      data: Joi.string().required(),
+      filename: Joi.string().optional()
+    }).optional(),
+    mentionAll: Joi.boolean().default(false)
+  }),
+
   // Example request schemas
   exampleMessage: Joi.object({
     message: Joi.string().required().min(1).max(500),

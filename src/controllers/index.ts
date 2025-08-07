@@ -6,3 +6,4 @@ export { GroupsController } from './groups.controller';
 export * as MessageController from './message.controller';
 export * as ChatController from './chat.controller';
 export * as AIController from './ai.controller';
+export * as AnalyticsController from './analytics.controller';

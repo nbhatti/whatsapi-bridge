@@ -3,3 +3,4 @@
 
 export { DeviceManager, Device } from './DeviceManager';
 export { AIService } from './AIService';
+export { AnalyticsService } from './AnalyticsService';

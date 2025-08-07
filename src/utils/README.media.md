@@ -4,14 +4,14 @@ The media utility provides helper functions to convert various media formats (UR
 
 ## Features
 
-- ✅ Convert media from URLs, base64 strings, or local file paths
-- ✅ Auto-detect MIME types using file signatures and extensions
-- ✅ Support for sticker conversion (image files only)
-- ✅ Support for voice message conversion (audio files only)
-- ✅ HD quality flag support
-- ✅ File size validation
-- ✅ Custom filename support
-- ✅ Comprehensive error handling
+- Convert media from URLs, base64 strings, or local file paths
+- Auto-detect MIME types using file signatures and extensions
+- Support for sticker conversion (image files only)
+- Support for voice message conversion (audio files only)
+- HD quality flag support
+- File size validation
+- Custom filename support
+- Comprehensive error handling
 
 ## Usage
 

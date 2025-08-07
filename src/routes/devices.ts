@@ -5,6 +5,7 @@ import { schemas } from '../config/validation';
 import messageRoutes from './messages';
 import groupRoutes from './groups';
 import chatRoutes from './chats';
+import analyticsRoutes from './analytics';
 
 const router = Router();
 
@@ -78,8 +79,19 @@ router.use('/:id/chats', chatRoutes);
 // Message routes for each device
 router.use('/:id/messages', messageRoutes);
 
+// Unified message routes for each device (new improved API)
+import unifiedMessageRoutes from './unified-messages';
+router.use('/:id/messages', unifiedMessageRoutes);
+
 // Group routes for each device
 router.use('/:id/groups', groupRoutes);
+
+// Mentions and Groups functionality
+import mentionsGroupsRoutes from './mentions-groups';
+router.use('/:id', mentionsGroupsRoutes);
+
+// Analytics routes for each device
+router.use('/:id/analytics', analyticsRoutes);
 
 /**
  * @swagger

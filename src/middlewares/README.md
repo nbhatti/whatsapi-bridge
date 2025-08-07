@@ -2,7 +2,7 @@
 
 This directory contains the core middleware components for the WhatsApp API server.
 
-## 📋 Available Middleware
+## Available Middleware
 
 ### 1. Authentication Middleware (`auth.ts`)
 
@@ -96,7 +96,7 @@ app.use(errorHandler);     // Handle all other errors
 }
 ```
 
-## 🚀 Quick Setup
+## Quick Setup
 
 1. **Environment Variables**
 ```bash
@@ -139,7 +139,7 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 ```
 
-## 🔒 Security Features
+## Security Features
 
 - **API Key Authentication**: Validates requests against environment variable
 - **Rate Limiting**: Prevents abuse with Redis-backed counting
@@ -147,7 +147,7 @@ app.use(errorHandler);
 - **Request Logging**: Tracks suspicious activities
 - **IP Whitelisting**: Bypasses limits for trusted sources
 
-## 📊 Monitoring
+## Monitoring
 
 All middleware components log important events:
 - Authentication attempts (success/failure)
@@ -157,7 +157,7 @@ All middleware components log important events:
 
 Check the `logs/` directory for detailed logs.
 
-## ⚡ Performance
+## Performance
 
 - **Redis Integration**: Distributed rate limiting across instances
 - **Memory Fallback**: Graceful degradation when Redis unavailable  

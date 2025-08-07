@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import deviceRoutes from '../devices';
 import aiRoutes from '../ai';
-import exampleRoutes from '../examples';
-import validationExampleRoutes from '../validation-examples';
 
 const router = Router();
 
@@ -22,10 +20,5 @@ router.use('/devices', deviceRoutes);
 // AI routes
 router.use('/ai', aiRoutes);
 
-// Example routes demonstrating middleware usage
-router.use('/examples', exampleRoutes);
-
-// Validation example routes
-router.use('/validation-examples', validationExampleRoutes);
 
 export default router;

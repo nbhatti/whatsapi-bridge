@@ -12,6 +12,7 @@ import {
   emitDeviceState,
   emitDeviceDisconnected,
 } from '../sockets';
+import { AnalyticsService } from './AnalyticsService';
 import fs from 'fs';
 import path from 'path';
 
@@ -300,12 +301,21 @@ export class DeviceManager {
             }
         });
 
-        client.on('message', (message) => {
+        client.on('message', async (message) => {
             // Log message reception at debug level to reduce noise
             logger.debug(`Message received on device ${this.getDeviceDisplayId(device)} from ${message.from}: ${message.body?.substring(0, 100)}${message.body?.length > 100 ? '...' : ''}`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitMessage(id, message);
+            
+            // Track message for analytics
+            try {
+                const chat = await message.getChat();
+                const analyticsService = new AnalyticsService();
+                await analyticsService.trackMessage(id, message, chat);
+            } catch (error) {
+                logger.error(`Failed to track message for analytics on device ${this.getDeviceDisplayId(device)}:`, error);
+            }
         });
 
         client.on('disconnected', (reason) => {
