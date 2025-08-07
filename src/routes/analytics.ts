@@ -99,7 +99,7 @@ router.get('/dashboard', AnalyticsController.getDashboard);
  *           default: 20
  *           minimum: 1
  *           maximum: 50
- *         description: Maximum number of unread chats to analyze (configurable via ANALYTICS_UNREAD_LIMIT env var)
+ *         description: Maximum number of unread chats to analyze (default from ANALYTICS_DEFAULT_LIMIT env var)
  *     responses:
  *       200:
  *         description: Unread messages detective report
@@ -187,9 +187,9 @@ router.get('/unread-detective', AnalyticsController.getUnreadDetective);
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 10
+ *           default: 20
  *           maximum: 50
- *         description: Maximum number of chatterboxes to return
+ *         description: Maximum number of chatterboxes to return (default from ANALYTICS_DEFAULT_LIMIT env var)
  *     responses:
  *       200:
  *         description: Chatterbox championship leaderboard

@@ -398,7 +398,7 @@ export class AnalyticsService {
     const cutoffTime = Date.now() - (timeRange * 24 * 60 * 60 * 1000);
     const relationshipInsights = [];
 
-    for (const chat of chats.slice(0, ANALYTICS_DEFAULTS.HEALTH_CHECK_LIMIT)) { // Analyze configurable number of active chats
+    for (const chat of chats.slice(0, ANALYTICS_DEFAULTS.DEFAULT_LIMIT)) { // Analyze default number of active chats
       const analytics = await this.analyzeChatDetailed(deviceId, chat, cutoffTime);
       if (!analytics || analytics.totalMessages < 5) continue;
 

@@ -70,26 +70,27 @@ This document describes all available environment variables for the WhatsAPI Bri
 
 ## Analytics Configuration
 
-Control default limits for analytics endpoints:
+Control default behavior for all analytics endpoints:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ANALYTICS_UNREAD_LIMIT` | `20` | Default unread chats to analyze |
-| `ANALYTICS_CHATTERBOX_LIMIT` | `10` | Default chatterboxes to show |
+| `ANALYTICS_DEFAULT_LIMIT` | `20` | Default result limit for all analytics endpoints |
 | `ANALYTICS_DEFAULT_DAYS` | `30` | Default time range in days |
-| `ANALYTICS_HEALTH_CHECK_LIMIT` | `20` | Default chats for health analysis |
-| `ANALYTICS_ARCHAEOLOGY_LIMIT` | `25` | Default archaeological dig depth |
+| `ANALYTICS_MAX_LIMIT` | `50` | Maximum allowed limit (safety cap) |
 
 ### Usage Examples
 ```bash
-# Use defaults
+# Use defaults (20 results, 30 days)
 GET /api/v1/devices/{id}/analytics/unread-detective
+GET /api/v1/devices/{id}/analytics/chatterboxes
 
 # Override with custom limit
 GET /api/v1/devices/{id}/analytics/unread-detective?limit=15
+GET /api/v1/devices/{id}/analytics/chatterboxes?limit=10
 
-# Custom time range
+# Custom time range with limit
 GET /api/v1/devices/{id}/analytics/chatterboxes?timeRange=7&limit=5
+GET /api/v1/devices/{id}/analytics/conversation-health-check?timeRange=14
 ```
 
 ## Blocking Prevention
@@ -190,7 +191,7 @@ PORT=3001
 REDIS_DB=1
 LOG_LEVEL=error
 MOCK_WHATSAPP=true
-ANALYTICS_UNREAD_LIMIT=5
+ANALYTICS_DEFAULT_LIMIT=5
 ```
 
 ## Security Checklist

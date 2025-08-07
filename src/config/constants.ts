@@ -55,9 +55,7 @@ export const TIME = {
 
 // Analytics defaults
 export const ANALYTICS_DEFAULTS = {
-  UNREAD_DETECTIVE_LIMIT: parseInt(process.env.ANALYTICS_UNREAD_LIMIT || '20'),
-  CHATTERBOXES_LIMIT: parseInt(process.env.ANALYTICS_CHATTERBOX_LIMIT || '10'),
+  DEFAULT_LIMIT: parseInt(process.env.ANALYTICS_DEFAULT_LIMIT || '20'),
   TIME_RANGE_DAYS: parseInt(process.env.ANALYTICS_DEFAULT_DAYS || '30'),
-  HEALTH_CHECK_LIMIT: parseInt(process.env.ANALYTICS_HEALTH_CHECK_LIMIT || '20'),
-  CONVERSATION_ARCHAEOLOGY_LIMIT: parseInt(process.env.ANALYTICS_ARCHAEOLOGY_LIMIT || '25'),
+  MAX_LIMIT: parseInt(process.env.ANALYTICS_MAX_LIMIT || '50'),
 } as const;

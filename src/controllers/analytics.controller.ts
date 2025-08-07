@@ -50,9 +50,9 @@ export const getDashboard = async (req: Request, res: Response): Promise<void> =
 export const getUnreadDetective = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { limit = ANALYTICS_DEFAULTS.UNREAD_DETECTIVE_LIMIT } = req.query;
+    const { limit = ANALYTICS_DEFAULTS.DEFAULT_LIMIT } = req.query;
     
-    const parsedLimit = Math.min(Math.max(parseInt(limit as string) || ANALYTICS_DEFAULTS.UNREAD_DETECTIVE_LIMIT, 1), 50);
+    const parsedLimit = Math.min(Math.max(parseInt(limit as string) || ANALYTICS_DEFAULTS.DEFAULT_LIMIT, 1), ANALYTICS_DEFAULTS.MAX_LIMIT);
     const unreadAnalysis = await analyticsService.getUnreadAnalysis(id, parsedLimit);
 
     res.json({
@@ -93,7 +93,7 @@ export const getUnreadDetective = async (req: Request, res: Response): Promise<v
 export const getChatterboxes = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { timeRange = '30', includeGroups = 'true', limit = '10' } = req.query;
+    const { timeRange = ANALYTICS_DEFAULTS.TIME_RANGE_DAYS, includeGroups = 'true', limit = ANALYTICS_DEFAULTS.DEFAULT_LIMIT } = req.query;
 
     const dashboard = await analyticsService.generateDashboard(id, {
       timeRange: parseInt(timeRange as string),
