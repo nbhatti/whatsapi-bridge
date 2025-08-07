@@ -6,7 +6,6 @@ import messageRoutes from './messages';
 import groupRoutes from './groups';
 import chatRoutes from './chats';
 import analyticsRoutes from './analytics';
-import unifiedMessageRoutes from './unified-messages';
 import mentionsGroupsRoutes from './mentions-groups';
 
 const router = Router();
@@ -78,10 +77,7 @@ router.get('/:id/status', validate(schemas.deviceId, 'params'), DeviceController
 // Chat routes for each device
 router.use('/:id/chats', chatRoutes);
 
-// Unified Messages - All-in-one message operations with forwarding, media, and location support
-router.use('/:id/messages', unifiedMessageRoutes);
-
-// Legacy message endpoint (for backward compatibility)
+// Messages - All message operations with queue reliability, advanced features, and management
 router.use('/:id/messages', messageRoutes);
 
 // Group routes for each device

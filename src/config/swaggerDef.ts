@@ -5,10 +5,10 @@ import { schemas } from './validation';
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
-    title: 'WhatsApp Web.js API',
-    version: '1.0.0',
+    title: 'WhatsApp Unified API',
+    version: '2.0.0',
     description:
-      'A RESTful API wrapper for the whatsapp-web.js library, designed to be hosted on your own server. This API provides a set of endpoints to interact with WhatsApp, allowing you to send messages, manage contacts, and handle devices programmatically. Secure, scalable, and easy to integrate into your applications.',
+      'A powerful, unified WhatsApp API wrapper built on whatsapp-web.js. Features reliable message queuing, device health protection, advanced messaging (text, media, location), message management (forward, delete, search), and comprehensive analytics. Self-hosted, secure, and production-ready.',
     license: {
       name: 'MIT',
       url: 'https://github.com/your-repo/blob/main/LICENSE',
@@ -35,44 +35,40 @@ const swaggerDefinition = {
       description: 'AI-powered chat analysis and intelligent features.',
     },
     {
+      name: 'Analytics',
+      description: 'Message analytics and communication insights.',
+    },
+    {
+      name: 'Cache',
+      description: 'Cache management and optimization endpoints.',
+    },
+    {
       name: 'Chats',
-      description: 'Endpoints for managing WhatsApp chats and conversations.',
+      description: 'Direct chat operations and conversation management.',
     },
     {
       name: 'Contacts',
-      description: 'Endpoints for retrieving contact information.',
+      description: 'Contact information and management.',
     },
     {
       name: 'Devices',
-      description: 'Endpoints for managing WhatsApp devices (sessions).',
-    },
-    {
-      name: 'Future',
-      description: 'Future and experimental endpoints under development.',
+      description: 'WhatsApp device (session) management and status.',
     },
     {
       name: 'Groups',
-      description: 'Endpoints for managing WhatsApp groups.',
+      description: 'WhatsApp group creation and management.',
     },
     {
-      name: 'Legacy Messages',
-      description: 'Legacy message endpoints maintained for backward compatibility.',
-    },
-    {
-      name: 'Unified Messages',
-      description: 'All-in-one message operations with proper forwarding, media, and location support.',
+      name: 'Messages',
+      description: 'Unified message operations with queue reliability, advanced features, and complete message management. Supports text, media, location, forwarding, search, and status monitoring.',
     },
     {
       name: 'Queue Management',
-      description: 'Message queue monitoring and configuration endpoints.',
+      description: 'Message queue monitoring, configuration, and health management.',
     },
     {
       name: 'Device Health',
-      description: 'Device health monitoring and warmup management.',
-    },
-    {
-      name: 'Validation Examples',
-      description: 'Examples showcasing Joi validation patterns.',
+      description: 'Device health monitoring, safety checks, and warmup management.',
     },
   ],
   components: {

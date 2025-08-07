@@ -1,16 +1,23 @@
 import { Router } from 'express';
-import { MessageController } from '../controllers';
+import * as MessageController from '../controllers/message.controller';
 import { validate } from '../middlewares';
 import { schemas } from '../config/validation';
 
-const router = Router({ mergeParams: true }); // mergeParams allows access to device :id param
+const router = Router({ mergeParams: true });
 
 /**
  * @swagger
- * /api/v1/devices/{id}/messages:
+ * tags:
+ *   name: Messages
+ *   description: Unified message operations with queue reliability, advanced features, and complete message management
+ */
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/messages/send:
  *   post:
- *     summary: Send a message from a device (Legacy)
- *     tags: [Legacy Messages]
+ *     summary: Send messages (text, media, location) with queue reliability
+ *     tags: [Messages]
  *     parameters:
  *       - in: path
  *         name: id
@@ -26,54 +33,226 @@ const router = Router({ mergeParams: true }); // mergeParams allows access to de
  *             type: object
  *             required:
  *               - to
- *               - type
  *             properties:
  *               to:
  *                 type: string
- *                 pattern: '^\\d{10,15}$'
- *                 description: Recipient phone number with country code
- *               type:
- *                 type: string
- *                 enum: [text, image, video, audio, document, sticker]
- *                 default: text
- *                 description: Message type
+ *                 description: Recipient phone number or chat ID
  *               text:
  *                 type: string
- *                 description: Message text (required for text messages)
- *               mediaBase64:
+ *                 description: Message text
+ *               media:
+ *                 type: object
+ *                 properties:
+ *                   data:
+ *                     type: string
+ *                     description: Base64 encoded media data
+ *                   mimetype:
+ *                     type: string
+ *                     example: "image/jpeg"
+ *                   filename:
+ *                     type: string
+ *                     example: "photo.jpg"
+ *               location:
+ *                 type: object
+ *                 properties:
+ *                   latitude:
+ *                     type: number
+ *                     example: 40.7128
+ *                   longitude:
+ *                     type: number
+ *                     example: -74.0060
+ *                   description:
+ *                     type: string
+ *                     example: "New York City"
+ *               quotedMessageId:
  *                 type: string
- *                 description: Base64 encoded media (for non-text messages)
- *               quotedId:
- *                 type: string
- *                 description: ID of message to quote
+ *                 description: ID of message to quote/reply to
  *               mentions:
  *                 type: array
  *                 items:
  *                   type: string
  *                 description: Array of phone numbers to mention
+ *               priority:
+ *                 type: string
+ *                 enum: [high, normal, low]
+ *                 default: normal
+ *                 description: Message priority (when using queue)
+ *               useQueue:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Use queue system for reliability (recommended)
+ *               enableTyping:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Show typing indicator (when using queue)
  *     responses:
- *       200:
- *         description: Message sent successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
+ *       201:
+ *         description: Message sent immediately (useQueue=false)
+ *       202:
+ *         description: Message queued successfully (useQueue=true)
  *       400:
  *         description: Invalid request or device not ready
+ *       429:
+ *         description: Device health protection - sending blocked
  *       500:
- *         description: Internal server error
+ *         description: Failed to send message
  */
-router.post('/', 
-  validate(schemas.deviceId, 'params'),
-  validate(schemas.sendMessage, 'body'),
+router.post('/send', 
+  validate(schemas.sendUnifiedMessage, 'body'),
   MessageController.sendMessage
 );
 
-// Message fetching is now handled by the chat routes at /api/v1/devices/{id}/chats/{chatId}/messages
+/**
+ * @swagger
+ * /api/v1/devices/{id}/messages/forward:
+ *   post:
+ *     summary: Forward messages with queue option
+ *     tags: [Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - messageId
+ *               - to
+ *             properties:
+ *               messageId:
+ *                 type: string
+ *                 description: ID of the message to forward
+ *               to:
+ *                 type: string
+ *                 description: Recipient chat ID or phone number
+ *               fromChatId:
+ *                 type: string
+ *                 description: Optional source chat ID for faster lookup
+ *               useQueue:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Use queue system for forwarding
+ *     responses:
+ *       200:
+ *         description: Message forwarded successfully
+ *       202:
+ *         description: Forward operation queued
+ *       404:
+ *         description: Message not found
+ */
+router.post('/forward', 
+  validate(schemas.forwardUnifiedMessage, 'body'),
+  MessageController.forwardMessage
+);
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/messages/delete:
+ *   post:
+ *     summary: Delete messages
+ *     tags: [Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - messageId
+ *             properties:
+ *               messageId:
+ *                 type: string
+ *                 description: ID of message to delete
+ *               forEveryone:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Delete for everyone (if possible)
+ *               fromChatId:
+ *                 type: string
+ *                 description: Optional chat ID for faster lookup
+ *     responses:
+ *       200:
+ *         description: Message deleted successfully
+ *       404:
+ *         description: Message not found
+ */
+router.post('/delete', 
+  validate(schemas.deleteUnifiedMessage, 'body'),
+  MessageController.deleteMessage
+);
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/messages/search:
+ *   get:
+ *     summary: Search messages across chats
+ *     tags: [Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search query
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *         description: Maximum results
+ *       - in: query
+ *         name: chatId
+ *         schema:
+ *           type: string
+ *         description: Optional chat ID to search within
+ *     responses:
+ *       200:
+ *         description: Search results
+ */
+router.get('/search', MessageController.searchMessages);
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/messages/status:
+ *   get:
+ *     summary: Get message queue and device status
+ *     tags: [Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *       - in: query
+ *         name: messageId
+ *         schema:
+ *           type: string
+ *         description: Optional message ID to check
+ *     responses:
+ *       200:
+ *         description: Status information
+ */
+router.get('/status', MessageController.getMessageStatus);
 
 export default router;
