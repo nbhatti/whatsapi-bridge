@@ -2,6 +2,13 @@ import { Request, Response } from 'express';
 import { Message, MessageMedia, Location } from 'whatsapp-web.js';
 import { DeviceManager } from '../services/DeviceManager';
 import { logger } from '../config';
+import { 
+  getCachedChatList, 
+  cacheChatList, 
+  getCachedChatDetail, 
+  cacheChatDetail, 
+  CachedChat 
+} from '../services/chatCache';
 
 export const listChats = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -30,8 +37,44 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { summary, filter, limit, search } = req.query;
-    let chats = await device.client.getChats();
+    const { summary, filter, limit, search, force_refresh } = req.query;
+    let chats: any[] = [];
+    let cacheUsed = false;
+    
+    // Try to get from cache first (unless force_refresh is requested)
+    if (!force_refresh) {
+      logger.debug(`Attempting to get cached chat list for device ${req.params.id}`);
+      const cachedChatList = await getCachedChatList(req.params.id);
+      
+      if (cachedChatList) {
+        logger.info(`Using cached chat list for device ${req.params.id} (${cachedChatList.chats.length} chats, cached at ${new Date(cachedChatList.cachedAt).toISOString()})`);
+        chats = cachedChatList.chats;
+        cacheUsed = true;
+      }
+    }
+    
+    // If no cache hit or force refresh, get fresh data from WhatsApp
+    if (chats.length === 0) {
+      logger.debug(`Fetching fresh chat list from WhatsApp for device ${req.params.id}`);
+      const freshChats = await device.client.getChats();
+      
+      // Cache the fresh data
+      await cacheChatList(req.params.id, freshChats);
+      logger.info(`Cached ${freshChats.length} fresh chats for device ${req.params.id}`);
+      
+      // Convert to our format for consistency
+      chats = freshChats.map(chat => ({
+        id: chat.id._serialized,
+        name: chat.name || chat.id.user || 'Unknown',
+        isGroup: chat.isGroup,
+        unreadCount: chat.unreadCount,
+        timestamp: chat.timestamp,
+        archived: chat.archived || false,
+        pinned: chat.pinned || false,
+        muted: chat.isMuted || false,
+        lastMessage: chat.lastMessage || null,
+      }));
+    }
     
     // Apply search filter if provided
     if (search && typeof search === 'string') {
@@ -99,6 +142,7 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
         data: chatSummary,
         total: chats.length,
         returned: chatSummary.length,
+        cached: cacheUsed,
         filters: {
           search: search || null,
           filter: filter || 'all'
@@ -114,6 +158,7 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
         data: limitedChats,
         total: chats.length,
         returned: limitedChats.length,
+        cached: cacheUsed,
         filters: {
           search: search || null,
           filter: filter || 'all'

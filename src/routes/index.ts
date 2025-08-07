@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import v1Routes from './v1';
+import { CacheController } from '../controllers';
 
 const router = Router();
 
@@ -11,6 +12,9 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Cache health check route
+router.get('/health/cache', CacheController.cacheHealth);
 
 // API v1 routes (all endpoints are now versioned)
 router.use('/v1', v1Routes);

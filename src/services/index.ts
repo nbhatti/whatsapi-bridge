@@ -6,3 +6,11 @@ export { AIService } from './AIService';
 export { AnalyticsService } from './AnalyticsService';
 export { MessageQueueService, QueuedMessage, MessageQueueConfig } from './MessageQueueService';
 export { DeviceHealthService, DeviceHealth, DeviceActivityLog } from './DeviceHealthService';
+export { 
+  cacheInbound, 
+  cacheOutbound, 
+  getRecentInbound, 
+  getRecentOutbound, 
+  getCacheStats, 
+  clearCache 
+} from './messageCache';

@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import qrcode from 'qrcode-terminal';
 import logger from './logger';
 import { getRedisClient } from './redis';
+import { cacheInbound, cacheOutbound } from '../services/messageCache';
+import { convertToLightMessageMeta, shouldCacheMessage } from '../utils/messageUtils';
 import path from 'path';
 import fs from 'fs';
 
@@ -138,6 +140,17 @@ const setupClientEventHandlers = (clientInstance: ClientInstance, config: WhatsA
     
     clientInstance.lastActivity = new Date();
     
+    // Cache inbound message
+    if (shouldCacheMessage(message)) {
+      try {
+        const messageMeta = convertToLightMessageMeta(message, id, false);
+        await cacheInbound(messageMeta);
+        logger.debug(`Cached inbound message ${messageMeta.messageId} from client ${id}`);
+      } catch (error) {
+        logger.error(`Failed to cache inbound message from client ${id}:`, error);
+      }
+    }
+    
     // Send webhook if configured
     if (config.webhook) {
       await sendWebhook(config.webhook, {
@@ -162,6 +175,17 @@ const setupClientEventHandlers = (clientInstance: ClientInstance, config: WhatsA
       });
       
       clientInstance.lastActivity = new Date();
+      
+      // Cache outbound message
+      if (shouldCacheMessage(message)) {
+        try {
+          const messageMeta = convertToLightMessageMeta(message, id, true);
+          await cacheOutbound(messageMeta);
+          logger.debug(`Cached outbound message ${messageMeta.messageId} from client ${id}`);
+        } catch (error) {
+          logger.error(`Failed to cache outbound message from client ${id}:`, error);
+        }
+      }
     }
   });
 };

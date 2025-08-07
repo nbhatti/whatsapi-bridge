@@ -6,6 +6,7 @@ export * from './validation';
 export * from './rateLimit';
 export * from './swagger';
 export * from './whatsapp';
+export * from './metrics';
 
 // Re-export commonly used items with aliases for convenience
 export { default as logger, morganLoggerStream } from './logger';

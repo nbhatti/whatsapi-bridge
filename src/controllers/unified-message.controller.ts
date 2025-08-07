@@ -26,45 +26,72 @@ export const sendUnifiedMessage = async (req: Request, res: Response): Promise<v
       type = 'text' 
     } = req.body;
 
-    logInfo(`Sending unified message from device ${id}`);
-
     const device = deviceManager.getDevice(id);
     if (!device || device.status !== 'ready') {
       res.status(400).json({ success: false, error: 'Device not ready to send messages.' });
       return;
     }
 
+    // Get device info for consistent logging
+    const deviceInfo = device.client?.info;
+    const phoneNumber = deviceInfo?.wid?.user || 'Unknown';
+    const pushName = deviceInfo?.pushname || 'Unknown User';
+    const deviceLabel = `${id} (${phoneNumber} - ${pushName})`;
+    
+    logInfo(`Sending unified message from device ${deviceLabel}`);
+
+    // Validate input data to prevent literal strings
+    if (!to || typeof to !== 'string' || to.trim() === '' || to === 'string') {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid recipient: `to` must be a valid phone number or chat ID.' 
+      });
+      return;
+    }
+
     // Format recipient properly
-    let formattedTo = to;
-    if (!to.includes('@')) {
-      formattedTo = `${to}@c.us`;
+    let formattedTo = to.trim();
+    if (!formattedTo.includes('@')) {
+      formattedTo = `${formattedTo}@c.us`;
     }
 
     // Build message options
     const sendOptions: MessageSendOptions = {};
     
-    // Handle quoted message
-    if (quotedMessageId) {
-      sendOptions.quotedMessageId = quotedMessageId;
+    // Handle quoted message - validate it's not a literal string
+    if (quotedMessageId && quotedMessageId !== 'string' && typeof quotedMessageId === 'string' && quotedMessageId.trim() !== '') {
+      sendOptions.quotedMessageId = quotedMessageId.trim();
       logInfo(`Replying to message: ${quotedMessageId}`);
+    } else if (quotedMessageId === 'string' || (quotedMessageId && quotedMessageId.trim() === '')) {
+      logInfo(`Ignoring invalid quotedMessageId: ${quotedMessageId}`);
     }
     
-    // Handle mentions
+    // Handle mentions - validate they're not literal strings
     if (mentions && Array.isArray(mentions) && mentions.length > 0) {
-      // Format mentions properly
-      const formattedMentions = mentions.map(mention => {
-        if (typeof mention === 'string') {
-          // If it's a phone number, format it
-          if (!mention.includes('@')) {
-            return `${mention}@c.us`;
-          }
-          return mention;
-        }
-        return mention;
-      });
+      // Filter out invalid mentions
+      const validMentions = mentions.filter(mention => 
+        mention && 
+        typeof mention === 'string' && 
+        mention.trim() !== '' && 
+        mention !== 'string'
+      );
       
-      sendOptions.mentions = formattedMentions;
-      logInfo(`Message includes ${formattedMentions.length} mentions: ${formattedMentions.join(', ')}`);
+      if (validMentions.length > 0) {
+        // Format mentions properly
+        const formattedMentions = validMentions.map(mention => {
+          const trimmedMention = mention.trim();
+          // If it's a phone number, format it
+          if (!trimmedMention.includes('@')) {
+            return `${trimmedMention}@c.us`;
+          }
+          return trimmedMention;
+        });
+        
+        sendOptions.mentions = formattedMentions;
+        logInfo(`Message includes ${formattedMentions.length} mentions: ${formattedMentions.join(', ')}`);
+      } else {
+        logInfo(`No valid mentions found in: ${JSON.stringify(mentions)}`);
+      }
     }
 
     let message;
@@ -80,29 +107,59 @@ export const sendUnifiedMessage = async (req: Request, res: Response): Promise<v
       );
       messageContent = locationObj;
       message = await device.client.sendMessage(formattedTo, messageContent, sendOptions);
-      logInfo(`Location message sent to ${formattedTo}`);
-    } else if (media && media.data) {
-      // Media message
+      logInfo(`Device ${deviceLabel} sent location message to ${formattedTo}`);
+    } else if (media && media.data && typeof media.data === 'string' && media.data !== 'string' && media.data.trim() !== '') {
+      // Media message - validate media data is not literal "string" and is valid base64
+      const mediaData = media.data.trim();
+      
+      // Basic base64 validation
+      const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+      if (!base64Regex.test(mediaData) || mediaData.length < 10) {
+        res.status(400).json({ 
+          success: false, 
+          error: 'Invalid media: media data must be valid base64 encoded content.' 
+        });
+        return;
+      }
+      
+      const validMimetype = (media.mimetype && media.mimetype !== 'string') ? media.mimetype : 'image/jpeg';
+      const validFilename = (media.filename && media.filename !== 'string') ? media.filename : 'media';
+      
       const mediaObj = new MessageMedia(
-        media.mimetype || 'image/jpeg',
-        media.data,
-        media.filename || 'media'
+        validMimetype,
+        mediaData,
+        validFilename
       );
       messageContent = mediaObj;
-      if (text) {
-        sendOptions.caption = text;
+      
+      // Handle caption - validate it's not a literal "string"
+      if (text && typeof text === 'string' && text.trim() !== '' && text !== 'string') {
+        sendOptions.caption = text.trim();
       }
+      
       message = await device.client.sendMessage(formattedTo, messageContent, sendOptions);
-      logInfo(`Media message (${media.mimetype}) sent to ${formattedTo}`);
-    } else if (text) {
-      // Text message
-      messageContent = text;
+      logInfo(`Device ${deviceLabel} sent media message (${validMimetype}) to ${formattedTo}`);
+    } else if (text && typeof text === 'string' && text.trim() !== '' && text !== 'string') {
+      // Text message - validate it's not a literal string
+      const cleanText = text.trim();
+      messageContent = cleanText;
       message = await device.client.sendMessage(formattedTo, messageContent, sendOptions);
-      logInfo(`Text message sent to ${formattedTo}`);
+      logInfo(`Device ${deviceLabel} sent text message to ${formattedTo}: ${cleanText.substring(0, 50)}${cleanText.length > 50 ? '...' : ''}`);
     } else {
+      // Provide specific error messages for different invalid scenarios
+      let errorMsg = 'Invalid message: must provide valid text, media, or location data.';
+      
+      if (media && media.data === 'string') {
+        errorMsg = 'Invalid media: media data cannot be the literal string "string".';
+      } else if (text === 'string') {
+        errorMsg = 'Invalid text: text cannot be the literal string "string".';
+      } else if (media && (!media.data || media.data.trim() === '')) {
+        errorMsg = 'Invalid media: media data is required and cannot be empty.';
+      }
+      
       res.status(400).json({ 
         success: false, 
-        error: 'Invalid message: must provide text, media, or location data.' 
+        error: errorMsg
       });
       return;
     }
@@ -121,8 +178,12 @@ export const sendUnifiedMessage = async (req: Request, res: Response): Promise<v
 
   } catch (error: any) {
     logError('Error sending unified message:', error);
-    logInfo(`Failed to send message to ${req.body.to}: ${error.message}`);
-    res.status(500).json({ 
+    const deviceInfo = device?.client?.info;
+    const phoneNumber = deviceInfo?.wid?.user || 'Unknown';
+    const pushName = deviceInfo?.pushname || 'Unknown User';
+    const deviceLabel = `${id} (${phoneNumber} - ${pushName})`;
+    logInfo(`Device ${deviceLabel} failed to send message to ${req.body.to}: ${error.message}`);
+    res.status(500).json({
       success: false, 
       error: 'Failed to send message.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined

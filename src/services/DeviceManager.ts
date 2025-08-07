@@ -14,6 +14,8 @@ import {
 } from '../sockets';
 import { AnalyticsService } from './AnalyticsService';
 import { DeviceHealthService } from './DeviceHealthService';
+import { cacheInbound, cacheOutbound } from './messageCache';
+import { convertToLightMessageMeta, shouldCacheMessage } from '../utils/messageUtils';
 import fs from 'fs';
 import path from 'path';
 
@@ -288,6 +290,9 @@ export class DeviceManager {
                 await this.updateDeviceInRedis(device);
                 emitDeviceReady(id);
                 
+                // Cache existing messages from recent chats
+                await this.cacheExistingMessages(device);
+                
                 // Start warmup phase for new devices
                 await healthService.startWarmupPhase(id);
                 await healthService.logActivity(id, {
@@ -302,6 +307,9 @@ export class DeviceManager {
                 device.lastSeen = Date.now();
                 await this.updateDeviceInRedis(device);
                 emitDeviceReady(id);
+                
+                // Cache existing messages even if device info extraction failed
+                await this.cacheExistingMessages(device);
                 
                 // Still start warmup and log activity
                 await healthService.startWarmupPhase(id);
@@ -344,6 +352,17 @@ export class DeviceManager {
             this.updateDeviceInRedis(device);
             emitMessage(id, message);
             
+            // Cache inbound message
+            if (shouldCacheMessage(message)) {
+                try {
+                    const messageMeta = convertToLightMessageMeta(message, id, false);
+                    await cacheInbound(messageMeta);
+                    logger.debug(`Cached inbound message ${messageMeta.messageId} from device ${this.getDeviceDisplayId(device)}`);
+                } catch (error) {
+                    logger.error(`Failed to cache inbound message from device ${this.getDeviceDisplayId(device)}:`, error);
+                }
+            }
+            
             // Track message for analytics
             try {
                 const chat = await message.getChat();
@@ -351,6 +370,25 @@ export class DeviceManager {
                 await analyticsService.trackMessage(id, message, chat);
             } catch (error) {
                 logger.error(`Failed to track message for analytics on device ${this.getDeviceDisplayId(device)}:`, error);
+            }
+        });
+
+        client.on('message_create', async (message) => {
+            if (message.fromMe) {
+                logger.debug(`Message sent from device ${this.getDeviceDisplayId(device)} to ${message.to}: ${message.body?.substring(0, 100)}${message.body?.length > 100 ? '...' : ''}`);
+                device.lastSeen = Date.now();
+                this.updateDeviceInRedis(device);
+                
+                // Cache outbound message
+                if (shouldCacheMessage(message)) {
+                    try {
+                        const messageMeta = convertToLightMessageMeta(message, id, true);
+                        await cacheOutbound(messageMeta);
+                        logger.debug(`Cached outbound message ${messageMeta.messageId} from device ${this.getDeviceDisplayId(device)}`);
+                    } catch (error) {
+                        logger.error(`Failed to cache outbound message from device ${this.getDeviceDisplayId(device)}:`, error);
+                    }
+                }
             }
         });
 
@@ -376,6 +414,62 @@ export class DeviceManager {
             this.updateDeviceInRedis(device);
             emitDeviceState(id, state);
         });
+    }
+
+    /**
+     * Cache existing messages from recent chats when device becomes ready
+     * This ensures we have recent message history in the cache
+     */
+    private async cacheExistingMessages(device: Device): Promise<void> {
+        try {
+            logInfo(`Caching existing messages for device ${this.getDeviceDisplayId(device)}`);
+            
+            // Get recent chats (limit to 10 most recent to avoid overwhelming)
+            const chats = await device.client.getChats();
+            const recentChats = chats.slice(0, 10);
+            
+            let totalInbound = 0;
+            let totalOutbound = 0;
+            
+            for (const chat of recentChats) {
+                try {
+                    // Get recent messages from this chat (last 20 messages)
+                    const messages = await chat.fetchMessages({ limit: 20 });
+                    
+                    for (const message of messages) {
+                        // Only cache messages from the last 24 hours to avoid overwhelming the cache
+                        const messageTime = message.timestamp * 1000;
+                        const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+                        
+                        if (messageTime < oneDayAgo || !shouldCacheMessage(message)) {
+                            continue;
+                        }
+                        
+                        try {
+                            if (message.fromMe) {
+                                // Outbound message
+                                const messageMeta = convertToLightMessageMeta(message, device.id, true);
+                                await cacheOutbound(messageMeta);
+                                totalOutbound++;
+                            } else {
+                                // Inbound message
+                                const messageMeta = convertToLightMessageMeta(message, device.id, false);
+                                await cacheInbound(messageMeta);
+                                totalInbound++;
+                            }
+                        } catch (error) {
+                            logger.error(`Failed to cache existing message ${message.id._serialized}:`, error);
+                        }
+                    }
+                } catch (error) {
+                    logger.error(`Failed to fetch messages for chat ${chat.id._serialized}:`, error);
+                }
+            }
+            
+            logInfo(`Cached ${totalInbound} inbound and ${totalOutbound} outbound existing messages for device ${this.getDeviceDisplayId(device)}`);
+        } catch (error) {
+            logError(`Failed to cache existing messages for device ${this.getDeviceDisplayId(device)}`, error);
+        }
     }
 
     private async updateDeviceInRedis(device: Device): Promise<void> {

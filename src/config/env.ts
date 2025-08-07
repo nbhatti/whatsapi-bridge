@@ -20,6 +20,11 @@ export const env = {
   // Rate limiting (example)
   RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+  
+  // Redis cache configuration
+  REDIS_ENABLED: process.env.REDIS_ENABLED === 'true',
+  SYNC_INTERVAL_MS: parseInt(process.env.SYNC_INTERVAL_MS || '5000', 10), // 5 seconds
+  MAX_LIST_LENGTH: parseInt(process.env.MAX_LIST_LENGTH || '1000', 10),
 } as const;
 
 // Validate required environment variables

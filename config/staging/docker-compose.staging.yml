@@ -1,0 +1,187 @@
+version: '3.8'
+
+services:
+  # Main application
+  whatsapp-api:
+    image: whatsapi-bridge:staging
+    container_name: whatsapp-api-staging
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # Use different port for staging
+    environment:
+      - NODE_ENV=staging
+      - PORT=3000
+      - API_KEY=${API_KEY:-staging-api-key}
+      
+      # Redis Configuration with Feature Flag
+      - REDIS_ENABLED=${REDIS_ENABLED:-true}
+      - REDIS_URL=redis://redis-staging:6379
+      - REDIS_HOST=redis-staging
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_MAX_RETRIES=5
+      - REDIS_CONNECT_TIMEOUT=10000
+      - REDIS_COMMAND_TIMEOUT=5000
+      
+      # Cache Configuration
+      - MAX_LIST_LENGTH=10000
+      - SYNC_INTERVAL_MS=5000
+      
+      # Monitoring Configuration
+      - ENABLE_METRICS=true
+      - ENABLE_HEALTH_CHECKS=true
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      
+      # Performance Settings
+      - MAX_MEMORY_USAGE_MB=1024
+      - REDIS_MEMORY_THRESHOLD_MB=512
+      
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    networks:
+      - staging-network
+    depends_on:
+      redis-staging:
+        condition: service_healthy
+      monitoring:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whatsapp-staging.rule=Host(\`staging.whatsapp-api.local\`)"
+      - "traefik.http.services.whatsapp-staging.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis for caching
+  redis-staging:
+    image: redis:alpine
+    container_name: redis-staging
+    restart: unless-stopped
+    ports:
+      - "6380:6379"  # Use different port for staging
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 100
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - redis-staging-data:/data
+      - ./config/redis.conf:/etc/redis/redis.conf:ro
+    networks:
+      - staging-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=false"  # Don't expose Redis externally
+
+  # Redis monitoring and metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter-staging
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis-staging:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - "9122:9121"
+    networks:
+      - staging-network
+    depends_on:
+      redis-staging:
+        condition: service_healthy
+
+  # Application monitoring
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: prometheus-staging
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-staging-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - staging-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus-staging.rule=Host(\`prometheus.staging.local\`)"
+
+  # Grafana dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-staging
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-staging}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-staging-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - staging-network
+    depends_on:
+      - monitoring
+
+  # Load balancer (Traefik)
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik-staging
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik:/etc/traefik:ro
+      - traefik-staging-certs:/letsencrypt
+    networks:
+      - staging-network
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+
+networks:
+  staging-network:
+    driver: bridge
+    name: whatsapp-staging-network
+
+volumes:
+  redis-staging-data:
+    name: redis-staging-data
+  prometheus-staging-data:
+    name: prometheus-staging-data  
+  grafana-staging-data:
+    name: grafana-staging-data
+  traefik-staging-certs:
+    name: traefik-staging-certs

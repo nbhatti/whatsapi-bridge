@@ -9,8 +9,8 @@ const router = Router({ mergeParams: true }); // mergeParams allows access to de
  * @swagger
  * /api/v1/devices/{id}/messages:
  *   post:
- *     summary: Send a message from a device
- *     tags: [Messages]
+ *     summary: Send a message from a device (Legacy)
+ *     tags: [Legacy Messages]
  *     parameters:
  *       - in: path
  *         name: id

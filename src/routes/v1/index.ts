@@ -2,6 +2,7 @@ import { Router } from 'express';
 import deviceRoutes from '../devices';
 import aiRoutes from '../ai';
 import queueRoutes from '../queue';
+import cacheRoutes from '../cache';
 
 const router = Router();
 
@@ -24,5 +25,7 @@ router.use('/ai', aiRoutes);
 // Queue management and health monitoring routes
 router.use('/', queueRoutes);
 
+// Cache management routes
+router.use('/cache', cacheRoutes);
 
 export default router;

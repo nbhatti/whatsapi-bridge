@@ -1,0 +1,23 @@
+{
+  "cache": {
+    "redis": {
+      "enabled": true,
+      "syncIntervalMs": 5000,
+      "maxListLength": 1000
+    }
+  },
+  "health": {
+    "enableCacheEndpoint": true,
+    "enableMetrics": true
+  },
+  "metrics": {
+    "prometheus": {
+      "enabled": true,
+      "prefix": "whatsapp_cache_",
+      "defaultLabels": {
+        "service": "whatsapi-bridge",
+        "environment": "development"
+      }
+    }
+  }
+}

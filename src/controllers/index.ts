@@ -8,3 +8,4 @@ export * as ChatController from './chat.controller';
 export * as AIController from './ai.controller';
 export * as AnalyticsController from './analytics.controller';
 export * as QueueController from './queue.controller';
+export { CacheController } from './cache.controller';

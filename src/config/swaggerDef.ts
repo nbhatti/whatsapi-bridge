@@ -55,12 +55,20 @@ const swaggerDefinition = {
       description: 'Endpoints for managing WhatsApp groups.',
     },
     {
-      name: 'Legacy',
-      description: 'Legacy endpoints maintained for backward compatibility.',
+      name: 'Legacy Messages',
+      description: 'Legacy message endpoints maintained for backward compatibility.',
     },
     {
-      name: 'Messages',
-      description: 'Endpoints for sending and fetching messages.',
+      name: 'Unified Messages',
+      description: 'All-in-one message operations with proper forwarding, media, and location support.',
+    },
+    {
+      name: 'Queue Management',
+      description: 'Message queue monitoring and configuration endpoints.',
+    },
+    {
+      name: 'Device Health',
+      description: 'Device health monitoring and warmup management.',
     },
     {
       name: 'Validation Examples',
