@@ -13,6 +13,7 @@ import {
   emitDeviceDisconnected,
 } from '../sockets';
 import { AnalyticsService } from './AnalyticsService';
+import { DeviceHealthService } from './DeviceHealthService';
 import fs from 'fs';
 import path from 'path';
 
@@ -140,6 +141,10 @@ export class DeviceManager {
         return this.devices.get(id);
     }
 
+    public getAllDevices(): Device[] {
+        return Array.from(this.devices.values());
+    }
+
     public async deleteDevice(id: string): Promise<void> {
         const device = this.devices.get(id);
         if (device) {
@@ -249,14 +254,22 @@ export class DeviceManager {
 
     private attachEventListeners(device: Device): void {
         const { client, id } = device;
+        const healthService = DeviceHealthService.getInstance();
 
-        client.on('qr', (qr) => {
-            logInfo(`QR code for device ${this.getDeviceDisplayId(device)}: ${qr}`);
+        client.on('qr', async (qr) => {
+            logInfo(`QR code generated for device ${this.getDeviceDisplayId(device)}`);
             device.status = 'qr';
             device.qrCode = qr;
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitQRCode(id, qr);
+            
+            // Log health activity
+            await healthService.logActivity(id, {
+                timestamp: Date.now(),
+                action: 'qr_generated',
+                success: true
+            });
         });
 
         client.on('ready', async () => {
@@ -274,6 +287,14 @@ export class DeviceManager {
                 device.lastSeen = Date.now();
                 await this.updateDeviceInRedis(device);
                 emitDeviceReady(id);
+                
+                // Start warmup phase for new devices
+                await healthService.startWarmupPhase(id);
+                await healthService.logActivity(id, {
+                    timestamp: Date.now(),
+                    action: 'connected',
+                    success: true
+                });
             } catch (err) {
                 logError(`Error extracting device info for ${id}`, err);
                 logInfo(`Device ${id} is ready`);
@@ -281,10 +302,18 @@ export class DeviceManager {
                 device.lastSeen = Date.now();
                 await this.updateDeviceInRedis(device);
                 emitDeviceReady(id);
+                
+                // Still start warmup and log activity
+                await healthService.startWarmupPhase(id);
+                await healthService.logActivity(id, {
+                    timestamp: Date.now(),
+                    action: 'connected',
+                    success: true
+                });
             }
         });
 
-        client.on('authenticated', () => {
+        client.on('authenticated', async () => {
             logInfo(`Device ${this.getDeviceDisplayId(device)} is authenticated`);
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
@@ -299,6 +328,13 @@ export class DeviceManager {
                 logError(`Failed to get client info for device ${this.getDeviceDisplayId(device)}`, err);
                 emitDeviceAuthenticated(id, 'unknown', 'WhatsApp Client');
             }
+            
+            // Log health activity
+            await healthService.logActivity(id, {
+                timestamp: Date.now(),
+                action: 'authenticated',
+                success: true
+            });
         });
 
         client.on('message', async (message) => {
@@ -318,12 +354,20 @@ export class DeviceManager {
             }
         });
 
-        client.on('disconnected', (reason) => {
+        client.on('disconnected', async (reason) => {
             logInfo(`Device ${this.getDeviceDisplayId(device)} disconnected: ${reason}`);
             device.status = 'disconnected';
             device.lastSeen = Date.now();
             this.updateDeviceInRedis(device);
             emitDeviceDisconnected(id, reason);
+            
+            // Log health activity
+            await healthService.logActivity(id, {
+                timestamp: Date.now(),
+                action: 'disconnected',
+                success: false,
+                error: reason
+            });
         });
 
         client.on('change_state', (state) => {

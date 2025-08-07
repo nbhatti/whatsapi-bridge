@@ -12,7 +12,7 @@ import {
   unhandledRejectionHandler 
 } from './middlewares';
 import { PORT } from './config/constants';
-import { DeviceManager } from './services';
+import { DeviceManager, MessageQueueService, DeviceHealthService } from './services';
 import routes from './routes';
 
 // Initialize exception handlers
@@ -35,13 +35,23 @@ app.use(express.urlencoded({ extended: true }));
 
 // Initialize Redis
 initializeRedis().then(async () => {
-  // Restore devices from Redis after Redis is connected
+  // Initialize blocking prevention services after Redis is ready
   try {
+    logger.info('Initializing blocking prevention services...');
+    
+    // Initialize services (singletons will be created)
+    const messageQueueService = MessageQueueService.getInstance();
+    const deviceHealthService = DeviceHealthService.getInstance();
+    
+    logger.info('Blocking prevention services initialized successfully');
+    
+    // Restore devices from Redis after services are ready
     const deviceManager = DeviceManager.getInstance();
     await deviceManager.restoreDevicesFromRedis();
     logger.info('Device restoration completed');
+    
   } catch (error) {
-    logger.error('Failed to restore devices:', error);
+    logger.error('Failed to initialize blocking prevention services or restore devices:', error);
   }
 }).catch(error => {
   logger.error('Failed to initialize Redis:', error);
