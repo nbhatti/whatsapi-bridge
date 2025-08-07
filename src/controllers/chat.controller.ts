@@ -21,6 +21,15 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Check if client is properly initialized
+    if (!device.client) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'WhatsApp client not initialized'
+      });
+      return;
+    }
+
     const { summary, filter, limit, search } = req.query;
     let chats = await device.client.getChats();
     
@@ -112,8 +121,13 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
       });
     }
   } catch (error) {
+    console.error('[DEBUG] Error listing chats:', error);
     logger.error('Error listing chats:', error);
-    res.status(500).json({ success: false, error: 'Failed to list chats' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to list chats',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

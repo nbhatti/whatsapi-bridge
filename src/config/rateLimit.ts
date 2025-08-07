@@ -20,6 +20,7 @@ const createRedisStore = () => {
         return Promise.resolve('') as any;
       }
     },
+    prefix: 'whatsapp:rate_limit:',
   });
 };
 
@@ -104,7 +105,7 @@ export const createCustomLimiter = (options: {
     max: options.max,
     store: createRedisStore(),
     keyGenerator: (req: Request) => {
-      const prefix = options.keyPrefix || 'custom';
+      const prefix = options.keyPrefix || 'whatsapp:custom';
       const ip = req.ip || req.socket.remoteAddress || 'unknown';
       return `${prefix}_${ip}`;
     },

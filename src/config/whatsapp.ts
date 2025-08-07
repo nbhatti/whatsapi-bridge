@@ -99,7 +99,7 @@ const setupClientEventHandlers = (clientInstance: ClientInstance, config: WhatsA
 
     // Save QR code to Redis with expiration
     const redisClient = getRedisClient();
-    await redisClient.setex(`qr:${id}`, 300, qr); // 5 minutes expiration
+    await redisClient.setex(`whatsapp:qr:${id}`, 300, qr); // 5 minutes expiration
     
     // Update client status
     await updateClientStatus(id, 'qr_code');
@@ -195,8 +195,8 @@ export const destroyClient = async (clientId: string): Promise<void> => {
     
     // Clean up Redis data
     const redisClient = getRedisClient();
-    await redisClient.del(`client:${clientId}`);
-    await redisClient.del(`qr:${clientId}`);
+    await redisClient.del(`whatsapp:client:${clientId}`);
+    await redisClient.del(`whatsapp:qr:${clientId}`);
     
     logger.info(`Client destroyed: ${clientId}`);
   } catch (error) {
@@ -218,13 +218,13 @@ export const getAllClients = (): ClientInstance[] => {
 // Save client metadata to Redis
 const saveClientMetadata = async (clientId: string, metadata: any): Promise<void> => {
   const redisClient = getRedisClient();
-  await redisClient.hset(`client:${clientId}`, metadata);
+  await redisClient.hset(`whatsapp:client:${clientId}`, metadata);
 };
 
 // Update client status
 const updateClientStatus = async (clientId: string, status: string): Promise<void> => {
   const redisClient = getRedisClient();
-  await redisClient.hset(`client:${clientId}`, {
+  await redisClient.hset(`whatsapp:client:${clientId}`, {
     status,
     lastUpdate: new Date().toISOString(),
   });

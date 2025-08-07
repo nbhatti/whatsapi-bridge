@@ -224,8 +224,6 @@ export const startDeviceWarmup = async (req: Request, res: Response): Promise<vo
     
     await deviceHealthService.startWarmupPhase(id);
     
-    logInfo(`Warmup phase started for device ${id}`);
-    
     res.json({
       success: true,
       message: 'Warmup phase started successfully',

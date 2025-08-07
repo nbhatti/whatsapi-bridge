@@ -327,8 +327,6 @@ export class DeviceHealthService {
     const warmupKey = `${this.WARMUP_KEY}:${deviceId}`;
     await this.redisClient.set(warmupKey, Date.now().toString());
     await this.redisClient.expire(warmupKey, 30 * 60); // 30 minutes
-    
-    logInfo(`Warmup phase started for device ${deviceId}`);
   }
 
   /**
