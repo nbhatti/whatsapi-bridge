@@ -97,7 +97,7 @@ export class MessageQueueService {
     // Add to Redis sorted set (sorted by scheduledAt)
     await this.redisClient.zadd(this.QUEUE_KEY, queuedMessage.scheduledAt, JSON.stringify(queuedMessage));
     
-    logInfo(`Message queued: ${messageId} for device ${message.deviceId} with ${delay}ms delay`);
+    logInfo(`Message queued: ${messageId} for device ${this.deviceManager.getFormattedDeviceId(message.deviceId)} with ${delay}ms delay`);
     
     return messageId;
   }
@@ -220,7 +220,8 @@ export class MessageQueueService {
         // Check if device is ready
         const device = this.deviceManager.getDevice(message.deviceId);
         if (!device || device.status !== 'ready') {
-          // Reschedule for later
+          // Remove from current position and reschedule for later
+          await this.redisClient.zrem(this.QUEUE_KEY, messageData);
           await this.rescheduleMessage(message, 30000); // 30 seconds later
           continue;
         }
@@ -284,10 +285,18 @@ export class MessageQueueService {
       await this.redisClient.set(`${this.DEVICE_LAST_MESSAGE_KEY}:${message.deviceId}`, Date.now().toString());
       await this.incrementDeviceMessageCount(message.deviceId);
 
-      logInfo(`Message sent successfully: ${message.id} to ${message.to} from device ${message.deviceId}`);
+      logInfo(`Message sent successfully: ${message.id} to ${message.to} from device ${this.deviceManager.getFormattedDeviceId(message.deviceId)}`);
       
-    } catch (error) {
-      logError(`Failed to send message ${message.id}:`, error);
+    } catch (error: any) {
+      logError(`Failed to send message ${message.id} to ${message.to}:`, {
+        error: error.message,
+        stack: error.stack,
+        messageId: message.id,
+        deviceId: message.deviceId,
+        to: message.to,
+        type: message.type,
+        content: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '')
+      });
       
       // Retry logic
       if (message.attempts < message.maxAttempts) {
@@ -332,9 +341,9 @@ export class MessageQueueService {
     ]);
 
     return {
-      pending: pending - processing,
+      pending: pending,
       processing,
-      totalQueued: pending,
+      totalQueued: pending + processing,
     };
   }
 

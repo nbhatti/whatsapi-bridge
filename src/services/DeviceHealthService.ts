@@ -99,7 +99,7 @@ export class DeviceHealthService {
         await this.updateDeviceHealth(deviceId);
       }
     } catch (error) {
-      logError(`Failed to log activity for device ${deviceId}:`, error);
+      logError(`Failed to log activity for device ${this.deviceManager.getFormattedDeviceId(deviceId)}:`, error);
     }
   }
 
@@ -153,7 +153,7 @@ export class DeviceHealthService {
 
     // Log warnings if any
     if (warnings.length > 0) {
-      logWarn(`Device ${deviceId} health warnings:`, warnings);
+      logWarn(`Device ${this.deviceManager.getFormattedDeviceId(deviceId)} health warnings:`, warnings);
     }
 
     return health;

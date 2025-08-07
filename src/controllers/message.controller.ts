@@ -8,8 +8,8 @@ const messageQueueService = MessageQueueService.getInstance();
 const deviceHealthService = DeviceHealthService.getInstance();
 
 /**
- * Unified Message Controller
- * Combines the best features from all message systems:
+ * Message Controller
+ * Handles all message operations:
  * - Queue system for reliability and anti-blocking protection
  * - Advanced features like location sharing, quotes, mentions
  * - Complete message management including forwarding, deletion, and search
@@ -17,7 +17,7 @@ const deviceHealthService = DeviceHealthService.getInstance();
 
 /**
  * POST /api/v1/devices/:id/messages/send
- * Enhanced unified message sending with queue system and advanced features
+ * Send messages with queue system and advanced features
  */
 export const sendMessage = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -41,7 +41,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Device health check (from Legacy system)
+    // Device health check
     const safetyCheck = await deviceHealthService.isSafeToSendMessage(id);
     if (!safetyCheck.safe) {
       res.status(429).json({ 
@@ -53,7 +53,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Enhanced validation (from all systems)
+    // Validation
     if (!to || typeof to !== 'string' || to.trim() === '') {
       res.status(400).json({ 
         success: false, 
@@ -68,7 +68,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       formattedTo = `${formattedTo}@c.us`;
     }
 
-    // Build message options (from Chat system)
+    // Build message options
     const sendOptions: MessageSendOptions = {};
     
     // Handle quoted message
@@ -118,7 +118,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     let result;
 
     if (useQueue) {
-      // Use queue system (from Legacy) - Recommended for reliability
+      // Use queue system - Recommended for reliability
       const messageId = await messageQueueService.queueMessage({
         deviceId: id,
         to: formattedTo,
@@ -150,7 +150,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
         data: result
       });
     } else {
-      // Direct sending (from Chat/Unified systems)
+      // Direct sending
       if (device.status !== 'ready') {
         res.status(400).json({ 
           success: false, 
@@ -193,10 +193,10 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       });
     }
 
-    logInfo(`Enhanced message ${useQueue ? 'queued' : 'sent'} from device ${id} to ${formattedTo}`);
+    logInfo(`Message ${useQueue ? 'queued' : 'sent'} from device ${deviceManager.getFormattedDeviceId(id)} to ${formattedTo}`);
 
   } catch (error: any) {
-    logError('Error in enhanced message sending:', error);
+    logError('Error in message sending:', error);
     res.status(500).json({
       success: false, 
       error: 'Failed to send message.',
@@ -206,7 +206,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
 };
 
 /**
- * Enhanced message forwarding (from Unified system)
+ * Forward message
  */
 export const forwardMessage = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -252,7 +252,7 @@ export const forwardMessage = async (req: Request, res: Response): Promise<void>
 
     let forwardedMessage;
     if (useQueue) {
-      // Queue the forward operation (enhanced feature)
+      // Queue the forward operation
       let content = '';
       let mediaData: string | undefined;
       let mediaType: string | undefined;
@@ -307,7 +307,7 @@ export const forwardMessage = async (req: Request, res: Response): Promise<void>
 };
 
 /**
- * Delete message (from Unified system)
+ * Delete message
  */
 export const deleteMessage = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -367,7 +367,7 @@ export const deleteMessage = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
- * Search messages (from Unified system)
+ * Search messages
  */
 export const searchMessages = async (req: Request, res: Response): Promise<void> => {
   try {

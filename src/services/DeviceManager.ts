@@ -93,6 +93,17 @@ export class DeviceManager {
         return device.id;
     }
 
+    /**
+     * Public method to get formatted device display ID
+     */
+    public getFormattedDeviceId(deviceId: string): string {
+        const device = this.devices.get(deviceId);
+        if (!device) {
+            return deviceId;
+        }
+        return this.getDeviceDisplayId(device);
+    }
+
     public static getInstance(): DeviceManager {
         if (!DeviceManager.instance) {
             DeviceManager.instance = new DeviceManager();
