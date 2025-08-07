@@ -104,7 +104,7 @@ export class AnalyticsService {
   constructor() {
     this.redisClient = getRedisClient();
     this.deviceManager = DeviceManager.getInstance();
-    this.aiService = new AIService();
+    this.aiService = AIService.getInstance();
   }
 
   /**
@@ -726,7 +726,7 @@ export class AnalyticsService {
 
   private async analyzeSentiment(text: string): Promise<'positive' | 'negative' | 'neutral'> {
     try {
-      const response = await this.aiService.generateResponse({
+      const response = await this.aiService.generateCompletion({
         provider: 'openrouter',
         model: 'mistralai/mistral-nemo',
         messages: [{
@@ -736,7 +736,9 @@ export class AnalyticsService {
         temperature: 0.1,
       });
       
-      const sentiment = response.toLowerCase().trim();
+      const responseText = response.choices[0]?.message?.content || 'neutral';
+      
+      const sentiment = responseText.toLowerCase().trim();
       if (['positive', 'negative', 'neutral'].includes(sentiment)) {
         return sentiment as 'positive' | 'negative' | 'neutral';
       }
@@ -760,14 +762,15 @@ Top 5 most active chats: ${chatAnalytics.slice(0, 5).map(c => `${c.name} (${c.to
 
 Provide a brief summary (2-3 sentences) and 3 actionable recommendations for better communication habits.`;
 
-      const response = await this.aiService.generateResponse({
+      const response = await this.aiService.generateCompletion({
         provider: 'openrouter',
         model: 'mistralai/mistral-nemo',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
       });
 
-      const lines = response.split('\n').filter(line => line.trim());
+      const responseText = response.choices[0]?.message?.content || summary;
+      const lines = responseText.split('\n').filter(line => line.trim());
       const summaryLines = lines.slice(0, 3).join(' ');
       const recommendations = lines.slice(3).filter(line => line.includes('-') || line.includes('•')).slice(0, 3);
 
@@ -819,12 +822,14 @@ One-way conversations: ${insights.filter(i => i.conversationPattern.includes('on
 
 Provide a brief analysis (3-4 sentences) about the communication patterns and relationship health.`;
 
-      return await this.aiService.generateResponse({
+      const response = await this.aiService.generateCompletion({
         provider: 'openrouter',
         model: 'mistralai/mistral-nemo',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
       });
+      
+      return response.choices[0]?.message?.content || `Your overall communication health score is ${(overallHealth * 100).toFixed(1)}%. This indicates ${overallHealth > 0.7 ? 'healthy' : overallHealth > 0.5 ? 'moderate' : 'needs improvement'} conversation patterns across your relationships.`;
     } catch (error) {
       return `Your overall communication health score is ${(overallHealth * 100).toFixed(1)}%. This indicates ${overallHealth > 0.7 ? 'healthy' : overallHealth > 0.5 ? 'moderate' : 'needs improvement'} conversation patterns across your relationships.`;
     }
@@ -840,12 +845,14 @@ Average response time: ${patterns.avgResponseTimeMinutes || 'Not available'} min
 
 Provide 2-3 sentences about what these patterns reveal about communication habits and productivity.`;
 
-      return await this.aiService.generateResponse({
+      const response = await this.aiService.generateCompletion({
         provider: 'openrouter',
         model: 'mistralai/mistral-nemo',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
       });
+      
+      return response.choices[0]?.message?.content || 'Your messaging patterns show consistent activity with good response times, indicating engaged communication habits.';
     } catch (error) {
       return 'Your messaging patterns show consistent activity with good response times, indicating engaged communication habits.';
     }

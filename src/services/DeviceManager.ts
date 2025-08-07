@@ -17,9 +17,9 @@ import { DeviceHealthService } from './DeviceHealthService';
 import fs from 'fs';
 import path from 'path';
 
-const DEVICES_SET_KEY = 'devices';
-const DEVICE_KEY_PREFIX = 'device:';
-const AUTH_KEY_PREFIX = 'auth:';
+const DEVICES_SET_KEY = 'whatsapp:devices';
+const DEVICE_KEY_PREFIX = 'whatsapp:device:';
+const AUTH_KEY_PREFIX = 'whatsapp:auth:';
 
 // Custom Redis store for LocalAuth
 class RedisStore {

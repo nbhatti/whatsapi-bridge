@@ -30,7 +30,7 @@ let redisReadyLogged = false;
  * @param keyPrefix - Prefix for Redis keys
  * @returns RedisStore instance or undefined if Redis is not available
  */
-const createRedisStore = (keyPrefix: string = 'rl') => {
+const createRedisStore = (keyPrefix: string = 'whatsapp:rl') => {
   try {
     const redisClient = getRedisClient();
     
@@ -72,7 +72,7 @@ const createRedisStore = (keyPrefix: string = 'rl') => {
 const defaultConfig: Partial<RateLimiterConfig> = {
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),      // 100 requests
-  keyPrefix: 'default',
+  keyPrefix: 'whatsapp:default',
   message: 'Too many requests from this IP, please try again later.',
 };
 
@@ -152,7 +152,7 @@ export const createRateLimiter = (config: RateLimiterConfig): RateLimitRequestHa
 export const apiRateLimiter = createRateLimiter({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),      // 100 requests
-  keyPrefix: 'api',
+  keyPrefix: 'whatsapp:api',
   message: 'API rate limit exceeded. Please slow down your requests.',
 });
 
@@ -160,7 +160,7 @@ export const apiRateLimiter = createRateLimiter({
 export const strictRateLimiter = createRateLimiter({
   windowMs: 900000,  // 15 minutes
   max: 10,           // 10 requests per window
-  keyPrefix: 'strict',
+  keyPrefix: 'whatsapp:strict',
   message: 'Too many attempts for sensitive operations. Please try again later.',
 });
 
@@ -168,7 +168,7 @@ export const strictRateLimiter = createRateLimiter({
 export const messageRateLimiter = createRateLimiter({
   windowMs: 60000,   // 1 minute
   max: 30,           // 30 messages per minute
-  keyPrefix: 'message',
+  keyPrefix: 'whatsapp:message',
   message: 'Message rate limit exceeded. Please slow down.',
 });
 
@@ -176,7 +176,7 @@ export const messageRateLimiter = createRateLimiter({
 export const uploadRateLimiter = createRateLimiter({
   windowMs: 600000,  // 10 minutes
   max: 50,           // 50 uploads per 10 minutes
-  keyPrefix: 'upload',
+  keyPrefix: 'whatsapp:upload',
   message: 'File upload rate limit exceeded. Please try again later.',
 });
 
@@ -184,7 +184,7 @@ export const uploadRateLimiter = createRateLimiter({
 export const clientOperationRateLimiter = createRateLimiter({
   windowMs: 300000,  // 5 minutes
   max: 20,           // 20 operations per 5 minutes
-  keyPrefix: 'client_ops',
+  keyPrefix: 'whatsapp:client_ops',
   message: 'Client operation rate limit exceeded. Please slow down.',
 });
 
@@ -192,7 +192,7 @@ export const clientOperationRateLimiter = createRateLimiter({
 export const adminRateLimiter = createRateLimiter({
   windowMs: 3600000, // 1 hour
   max: 5,            // 5 admin ops per hour
-  keyPrefix: 'admin',
+  keyPrefix: 'whatsapp:admin',
   message: 'Admin operation rate limit exceeded. Please try again later.',
 });
 
@@ -207,7 +207,7 @@ export const createPerUserRateLimiter = (config: Partial<RateLimiterConfig> = {}
   const fullConfig: RateLimiterConfig = {
     windowMs: config.windowMs || defaultConfig.windowMs!,
     max: config.max || defaultConfig.max!,
-    keyPrefix: config.keyPrefix || 'per_user',
+    keyPrefix: config.keyPrefix || 'whatsapp:per_user',
     message: config.message,
     skipSuccessfulRequests: config.skipSuccessfulRequests,
     skipFailedRequests: config.skipFailedRequests,
@@ -225,7 +225,7 @@ export const createPerUserRateLimiter = (config: Partial<RateLimiterConfig> = {}
 export const slidingWindowRateLimiter = createRateLimiter({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),      // 100 requests
-  keyPrefix: 'sliding',
+  keyPrefix: 'whatsapp:sliding',
   message: 'Request rate exceeded for sliding window. Please slow down.',
   skipSuccessfulRequests: false,
   skipFailedRequests: true, // Don't count failed requests against the limit
