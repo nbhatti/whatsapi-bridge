@@ -113,6 +113,12 @@ export class AnalyticsService {
    */
   async trackMessage(deviceId: string, message: Message, chat: Chat): Promise<void> {
     try {
+      // Validate deviceId to prevent undefined keys
+      if (!deviceId || deviceId === 'undefined' || typeof deviceId !== 'string') {
+        logger.error(`Invalid deviceId provided to trackMessage: ${deviceId}`);
+        return;
+      }
+      
       const messageAnalytics: MessageAnalytics = {
         id: message.id._serialized,
         chatId: chat.id._serialized,
