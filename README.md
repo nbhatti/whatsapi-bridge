@@ -47,12 +47,16 @@ Developed by **[yLinx](https://ylinx.pk)** - A leading IT consulting and cloud s
 - [License](#-license)
 - [Support](#-support)
 
-### 📚 Additional Documentation
-- **[🚀 Quick Start Guide](QUICKSTART.md)** - Get up and running in minutes
-- **[🔧 Installation Guide](INSTALLATION.md)** - Comprehensive installation instructions
-- **[🤝 Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to the project
-- **[🔒 Security Policy](SECURITY.md)** - Security guidelines and reporting
-- **[📋 Changelog](CHANGELOG.md)** - Version history and release notes
+### 📚 Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[📚 Documentation Index](docs/documentation-index.md)** - Complete documentation guide
+- **[🚀 Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in minutes
+- **[🔧 Installation Guide](docs/INSTALLATION.md)** - Comprehensive installation instructions
+- **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
+- **[🔒 Security Policy](docs/SECURITY.md)** - Security guidelines and reporting
+- **[📋 Changelog](docs/CHANGELOG.md)** - Version history and release notes
 
 ## ⚠️ Disclaimers
 
