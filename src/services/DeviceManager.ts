@@ -272,6 +272,13 @@ export class DeviceManager {
 
     private attachEventListeners(device: Device): void {
         const { client, id } = device;
+        
+        // Validate device ID to prevent undefined keys
+        if (!id || id === 'undefined' || typeof id !== 'string') {
+            logError(`Invalid device ID detected in attachEventListeners: ${id}`);
+            return;
+        }
+        
         const healthService = DeviceHealthService.getInstance();
 
         client.on('qr', async (qr) => {

@@ -87,6 +87,12 @@ export class DeviceHealthService {
    */
   public async logActivity(deviceId: string, activity: DeviceActivityLog): Promise<void> {
     try {
+      // Validate deviceId to prevent undefined keys
+      if (!deviceId || deviceId === 'undefined' || typeof deviceId !== 'string') {
+        logError(`Invalid deviceId provided to logActivity: ${deviceId}`);
+        return;
+      }
+      
       const key = `${this.ACTIVITY_KEY}:${deviceId}`;
       const activityData = JSON.stringify(activity);
       

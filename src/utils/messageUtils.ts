@@ -10,6 +10,11 @@ export function convertToLightMessageMeta(
   deviceId: string,
   fromMe: boolean = false
 ): LightMessageMeta {
+  // Validate deviceId to prevent undefined keys
+  if (!deviceId || deviceId === 'undefined' || typeof deviceId !== 'string') {
+    throw new Error(`Invalid deviceId provided to convertToLightMessageMeta: ${deviceId}`);
+  }
+  
   return {
     messageId: message.id._serialized || message.id.id || 'unknown',
     chatId: message.from || message.to || 'unknown',
