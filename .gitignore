@@ -172,6 +172,7 @@ coverage/
 *.cert
 secrets.json
 config/production.json
+secrets/
 
 # Backup files
 *.bak

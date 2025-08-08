@@ -153,7 +153,22 @@ docker-compose -f docker-compose.redis.yml up -d
 docker-compose -f docker-compose.redis.yml down
 ```
 
-### Running the Application
+### Quick Development Setup with Docker
+
+For the fastest development setup, use our Docker development environment:
+
+```sh
+# Start all development services (API, Frontend, PostgreSQL, Redis)
+npm run docker:up:dev
+```
+
+**That's it!** The complete development environment will be running with:
+- API server with hot-reload at http://localhost:3000
+- Frontend development server at http://localhost:4000
+- PostgreSQL database at localhost:5432
+- Redis cache at localhost:6379
+
+### Running the Application (Traditional Setup)
 
 * **Development:**
   ```sh
@@ -204,13 +219,41 @@ npm run docker:down
 
 ### Development with Docker
 
+The development environment includes all services needed for local development:
+- **API** (backend) - Running on port 3000 with hot-reload
+- **Frontend** - Next.js development server on port 4000 with hot-reload  
+- **PostgreSQL** - Database server on port 5432
+- **Redis** - Cache and session store on port 6379
+
 ```bash
-# Development mode with hot reloading
+# Start development environment in background
+npm run docker:up:dev
+
+# Start development environment with logs (foreground)
 npm run docker:dev
 
 # Build development containers
 npm run docker:dev:build
+
+# Stop development environment
+npm run docker:down
+
+# View logs from all services
+npm run docker:logs
 ```
+
+#### Development Environment Features:
+- 🔥 **Hot-reload** - Both API and frontend automatically reload on code changes
+- 🗄️ **PostgreSQL Database** - Full database setup with persistent volumes
+- ⚡ **Volume Mounting** - Source code mounted for instant updates
+- 🔧 **Environment Variables** - Configured from your `.env` file
+
+#### Service URLs:
+- **API**: http://localhost:3000
+- **Frontend**: http://localhost:4000  
+- **API Docs**: http://localhost:3000/docs
+- **PostgreSQL**: localhost:5432 (database: `whatsapi`)
+- **Redis**: localhost:6379
 
 ### Production Deployment
 

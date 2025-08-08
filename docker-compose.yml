@@ -16,8 +16,14 @@ services:
       - PORT=3000
     env_file:
       - .env
+    secrets:
+      - db_password
+      - db_user
+      - db_name
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
@@ -25,6 +31,30 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - whatsapp-network
+
+  postgres:
+    image: postgres:16
+    container_name: whatsapp-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB_FILE=/run/secrets/db_name
+      - POSTGRES_USER_FILE=/run/secrets/db_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+      - db_user
+      - db_name
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $(cat /run/secrets/db_user)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - whatsapp-network
 
@@ -45,8 +75,17 @@ services:
     networks:
       - whatsapp-network
 
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  db_user:
+    file: ./secrets/db_user.txt
+  db_name:
+    file: ./secrets/db_name.txt
+
 volumes:
   redis_data:
+  postgres_data:
 
 networks:
   whatsapp-network:
