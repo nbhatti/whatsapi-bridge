@@ -161,13 +161,42 @@ export class DeviceManager {
     public async deleteDevice(id: string): Promise<void> {
         const device = this.devices.get(id);
         if (device) {
-            await device.client.destroy();
+            logInfo(`Starting comprehensive cleanup for device ${this.getDeviceDisplayId(device)}`);
+            
+            try {
+                // Gracefully destroy the WhatsApp client
+                await device.client.destroy();
+            } catch (error) {
+                logError(`Error destroying WhatsApp client for device ${id}:`, error);
+            }
+            
+            // Remove from in-memory devices
             this.devices.delete(id);
+            
+            // Remove from Redis devices set
+            await this.redisClient.srem(DEVICES_SET_KEY, id);
+            
+            // Remove device data from Redis
+            await this.redisClient.del(`${DEVICE_KEY_PREFIX}${id}`);
+            
+            // Clean up authentication data
+            await this.redisStore.delete({ clientId: id });
+            
+            // Clean up related analytics and health data
+            await this.cleanupDeviceRelatedData(id);
+            
+            // Emit disconnection event
+            emitDeviceDisconnected(id, 'Device deleted');
+            
+            logInfo(`Device cleanup completed successfully for ${id}`);
+        } else {
+            logInfo(`Device ${id} not found in memory, performing Redis cleanup only`);
+            
+            // Still perform Redis cleanup in case device exists only in Redis
             await this.redisClient.srem(DEVICES_SET_KEY, id);
             await this.redisClient.del(`${DEVICE_KEY_PREFIX}${id}`);
-            // Also cleanup auth data
             await this.redisStore.delete({ clientId: id });
-            emitDeviceDisconnected(id, 'Device deleted');
+            await this.cleanupDeviceRelatedData(id);
         }
     }
 
@@ -257,7 +286,12 @@ export class DeviceManager {
 
                 // Initialize the client
                 client.initialize().catch(err => {
-                    logError(`Failed to restore device ${this.getDeviceDisplayId(device)}`, err);
+                    logError(`WhatsApp client initialization failed for device ${this.getDeviceDisplayId(device)}:`, {
+                        deviceId: deviceId,
+                        error: err.message,
+                        errorType: err.name,
+                        stack: err.stack
+                    });
                     device.status = 'error';
                     this.updateDeviceInRedis(device);
                     emitDeviceState(deviceId, 'error');
@@ -517,6 +551,112 @@ export class DeviceManager {
         }
         
         await this.redisClient.hset(`${DEVICE_KEY_PREFIX}${device.id}`, deviceData);
+    }
+
+    /**
+     * Comprehensive cleanup of all device-related Redis data
+     */
+    private async cleanupDeviceRelatedData(deviceId: string): Promise<void> {
+        try {
+            logInfo(`Starting cleanup of related data for device ${deviceId}`);
+            
+            // Get all keys potentially related to this device
+            const patterns = [
+                `*${deviceId}*`, // Any key containing the device ID
+                `${deviceId}*`,  // Keys starting with device ID
+                `*:${deviceId}:*`, // Keys with device ID as middle segment
+                `*:${deviceId}`,   // Keys ending with device ID
+            ];
+            
+            let totalKeysDeleted = 0;
+            
+            for (const pattern of patterns) {
+                try {
+                    const keys = await this.redisClient.keys(pattern);
+                    
+                    if (keys.length > 0) {
+                        logInfo(`Found ${keys.length} keys matching pattern '${pattern}' for device ${deviceId}`);
+                        
+                        // Filter out keys that might belong to other devices with similar IDs
+                        const deviceSpecificKeys = keys.filter(key => {
+                            // Only delete keys that are specifically for this device
+                            return (
+                                key.includes(`${deviceId}:`) || 
+                                key.includes(`:${deviceId}:`) || 
+                                key.endsWith(`:${deviceId}`) ||
+                                key === deviceId ||
+                                key.startsWith(`${deviceId}`) ||
+                                key.startsWith(`whatsapp:device:${deviceId}`) ||
+                                key.startsWith(`whatsapp:auth:${deviceId}`) ||
+                                key.startsWith(`whatsapp:health:${deviceId}`) ||
+                                key.startsWith(`whatsapp:analytics:${deviceId}`) ||
+                                key.includes(`${deviceId}26ca8d`) || // Handle corrupted key patterns
+                                key.includes(`${deviceId}@`)
+                            );
+                        });
+                        
+                        if (deviceSpecificKeys.length > 0) {
+                            logInfo(`Deleting ${deviceSpecificKeys.length} device-specific keys for ${deviceId}:`, deviceSpecificKeys);
+                            const deletedCount = await this.redisClient.del(...deviceSpecificKeys);
+                            totalKeysDeleted += deletedCount;
+                            logInfo(`Successfully deleted ${deletedCount} keys for device ${deviceId}`);
+                        }
+                    }
+                } catch (error) {
+                    logError(`Error cleaning up keys with pattern '${pattern}' for device ${deviceId}:`, error);
+                }
+            }
+            
+            // Specific cleanup for known key patterns
+            const specificKeys = [
+                `whatsapp:device:${deviceId}`,
+                `whatsapp:auth:${deviceId}`,
+                `whatsapp:health:${deviceId}`,
+                `whatsapp:analytics:messages:${deviceId}`,
+                `whatsapp:analytics:chats:${deviceId}`,
+                `device:${deviceId}:health`,
+                `device:${deviceId}:messages`,
+                `device:${deviceId}:chats`,
+            ];
+            
+            const existingSpecificKeys = [];
+            for (const key of specificKeys) {
+                const exists = await this.redisClient.exists(key);
+                if (exists) {
+                    existingSpecificKeys.push(key);
+                }
+            }
+            
+            if (existingSpecificKeys.length > 0) {
+                logInfo(`Cleaning up ${existingSpecificKeys.length} specific keys for device ${deviceId}`);
+                const deletedSpecific = await this.redisClient.del(...existingSpecificKeys);
+                totalKeysDeleted += deletedSpecific;
+            }
+            
+            // Clean up any sets that might contain this device ID
+            const setsToClean = [
+                'whatsapp:devices',
+                'active_devices',
+                'healthy_devices',
+                'error_devices',
+            ];
+            
+            for (const setKey of setsToClean) {
+                try {
+                    const removed = await this.redisClient.srem(setKey, deviceId);
+                    if (removed > 0) {
+                        logInfo(`Removed device ${deviceId} from set '${setKey}'`);
+                    }
+                } catch (error) {
+                    logError(`Error removing device ${deviceId} from set '${setKey}':`, error);
+                }
+            }
+            
+            logInfo(`Completed cleanup for device ${deviceId}. Total keys deleted: ${totalKeysDeleted}`);
+            
+        } catch (error) {
+            logError(`Error during comprehensive cleanup for device ${deviceId}:`, error);
+        }
     }
 }
 
