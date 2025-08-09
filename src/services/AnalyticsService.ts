@@ -114,8 +114,14 @@ export class AnalyticsService {
   async trackMessage(deviceId: string, message: Message, chat: Chat): Promise<void> {
     try {
       // Validate deviceId to prevent undefined keys
-      if (!deviceId || deviceId === 'undefined' || typeof deviceId !== 'string') {
-        logger.error(`Invalid deviceId provided to trackMessage: ${deviceId}`);
+      if (!deviceId || deviceId === 'undefined' || typeof deviceId !== 'string' || deviceId.trim() === '') {
+        logger.error(`Invalid deviceId provided to trackMessage: '${deviceId}' - skipping analytics tracking`);
+        return;
+      }
+
+      // Validate chat and message objects
+      if (!message?.id?._serialized || !chat?.id?._serialized) {
+        logger.error(`Invalid message or chat object provided to trackMessage for device ${deviceId}`);
         return;
       }
       
@@ -141,15 +147,16 @@ export class AnalyticsService {
         }
       }
 
-      // Store individual message
+      // Store individual message with additional validation
+      const messageHistoryKey = `${AnalyticsService.MESSAGE_HISTORY_PREFIX}${deviceId}:${chat.id._serialized}`;
       await this.redisClient.lpush(
-        `${this.MESSAGE_HISTORY_PREFIX}${deviceId}:${chat.id._serialized}`,
+        messageHistoryKey,
         JSON.stringify(messageAnalytics)
       );
 
       // Keep only last 1000 messages per chat
       await this.redisClient.ltrim(
-        `${this.MESSAGE_HISTORY_PREFIX}${deviceId}:${chat.id._serialized}`,
+        `${AnalyticsService.MESSAGE_HISTORY_PREFIX}${deviceId}:${chat.id._serialized}`,
         0,
         999
       );
@@ -368,10 +375,11 @@ export class AnalyticsService {
         totalUnreadMessages: unreadChats.reduce((sum, chat) => sum + chat.unreadCount, 0),
         oldestUnreadDays: oldestUnreadDays === 0 ? 0 : oldestUnreadDays,
         priorityContacts: unreadAnalysis.filter(chat => chat.priority === 'high').length,
-        displayedChats: limitedUnreadAnalysis.length,
-        limitApplied: limit < unreadAnalysis.length,
       },
-      unreadChats: limitedUnreadAnalysis,
+      unreadChats: limitedUnreadAnalysis.map(chat => ({
+        ...chat,
+        daysSinceLastMessage: chat.daysSinceLastMessage || 0 // Convert null to 0 for the interface
+      })),
       recommendations,
     };
   }
@@ -524,7 +532,7 @@ export class AnalyticsService {
     try {
       // Delete message history
       if (includeMessages) {
-        const messageKeys = await this.redisClient.keys(`${this.MESSAGE_HISTORY_PREFIX}${deviceId}:*`);
+        const messageKeys = await this.redisClient.keys(`${AnalyticsService.MESSAGE_HISTORY_PREFIX}${deviceId}:*`);
         if (messageKeys.length > 0) {
           totalDeleted += await this.redisClient.del(...messageKeys);
           deletedCategories.push('message_history');
@@ -533,7 +541,7 @@ export class AnalyticsService {
 
       // Delete chat statistics
       if (includeChatStats) {
-        const chatStatsKeys = await this.redisClient.keys(`${this.CHAT_STATS_PREFIX}${deviceId}:*`);
+        const chatStatsKeys = await this.redisClient.keys(`${AnalyticsService.CHAT_STATS_PREFIX}${deviceId}:*`);
         if (chatStatsKeys.length > 0) {
           totalDeleted += await this.redisClient.del(...chatStatsKeys);
           deletedCategories.push('chat_statistics');
@@ -542,7 +550,7 @@ export class AnalyticsService {
 
       // Delete daily statistics
       if (includeDailyStats) {
-        const dailyStatsKeys = await this.redisClient.keys(`${this.ANALYTICS_PREFIX}daily:${deviceId}:*`);
+        const dailyStatsKeys = await this.redisClient.keys(`${AnalyticsService.ANALYTICS_PREFIX}daily:${deviceId}:*`);
         if (dailyStatsKeys.length > 0) {
           totalDeleted += await this.redisClient.del(...dailyStatsKeys);
           deletedCategories.push('daily_statistics');
@@ -550,7 +558,7 @@ export class AnalyticsService {
       }
 
       // Delete cached analytics
-      const cacheKeys = await this.redisClient.keys(`${this.ANALYTICS_PREFIX}cache:${deviceId}:*`);
+      const cacheKeys = await this.redisClient.keys(`${AnalyticsService.ANALYTICS_PREFIX}cache:${deviceId}:*`);
       if (cacheKeys.length > 0) {
         totalDeleted += await this.redisClient.del(...cacheKeys);
         deletedCategories.push('cached_analytics');
@@ -666,7 +674,7 @@ export class AnalyticsService {
   }
 
   private async getStoredMessages(deviceId: string, chatId: string, cutoffTime: number): Promise<MessageAnalytics[]> {
-    const messageStrings = await this.redisClient.lrange(`${this.MESSAGE_HISTORY_PREFIX}${deviceId}:${chatId}`, 0, -1);
+    const messageStrings = await this.redisClient.lrange(`${AnalyticsService.MESSAGE_HISTORY_PREFIX}${deviceId}:${chatId}`, 0, -1);
     return messageStrings
       .map(str => JSON.parse(str) as MessageAnalytics)
       .filter(msg => msg.timestamp >= cutoffTime)
@@ -674,7 +682,7 @@ export class AnalyticsService {
   }
 
   private async updateChatStats(deviceId: string, chat: Chat, message: MessageAnalytics): Promise<void> {
-    const key = `${this.CHAT_STATS_PREFIX}${deviceId}:${chat.id._serialized}`;
+    const key = `${AnalyticsService.CHAT_STATS_PREFIX}${deviceId}:${chat.id._serialized}`;
     await this.redisClient.hincrby(key, 'totalMessages', 1);
     await this.redisClient.hincrby(key, message.fromMe ? 'sentByMe' : 'receivedFromThem', 1);
     await this.redisClient.hset(key, 'lastMessageTime', message.timestamp);
@@ -684,14 +692,14 @@ export class AnalyticsService {
 
   private async updateDailyStats(deviceId: string, message: MessageAnalytics): Promise<void> {
     const date = new Date(message.timestamp).toISOString().split('T')[0];
-    const key = `${this.ANALYTICS_PREFIX}daily:${deviceId}:${date}`;
+    const key = `${AnalyticsService.ANALYTICS_PREFIX}daily:${deviceId}:${date}`;
     await this.redisClient.hincrby(key, 'totalMessages', 1);
     await this.redisClient.hincrby(key, message.fromMe ? 'sent' : 'received', 1);
     await this.redisClient.expire(key, 90 * 24 * 60 * 60); // Expire after 90 days
   }
 
   private async getLastMessageFromMe(deviceId: string, chatId: string): Promise<MessageAnalytics | null> {
-    const messages = await this.redisClient.lrange(`${this.MESSAGE_HISTORY_PREFIX}${deviceId}:${chatId}`, 0, 50);
+    const messages = await this.redisClient.lrange(`${AnalyticsService.MESSAGE_HISTORY_PREFIX}${deviceId}:${chatId}`, 0, 50);
     for (const msgStr of messages) {
       const msg = JSON.parse(msgStr) as MessageAnalytics;
       if (msg.fromMe) return msg;

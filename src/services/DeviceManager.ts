@@ -388,9 +388,14 @@ export class DeviceManager {
             
             // Track message for analytics
             try {
-                const chat = await message.getChat();
-                const analyticsService = new AnalyticsService();
-                await analyticsService.trackMessage(id, message, chat);
+                // Validate device ID before calling analytics
+                if (id && id !== 'undefined' && typeof id === 'string' && id.trim() !== '') {
+                    const chat = await message.getChat();
+                    const analyticsService = new AnalyticsService();
+                    await analyticsService.trackMessage(id, message, chat);
+                } else {
+                    logger.error(`Invalid device ID detected in message handler: '${id}' - skipping analytics`);
+                }
             } catch (error) {
                 logger.error(`Failed to track message for analytics on device ${this.getDeviceDisplayId(device)}:`, error);
             }
