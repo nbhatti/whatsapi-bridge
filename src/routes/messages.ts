@@ -198,8 +198,16 @@ router.post('/delete',
  * @swagger
  * /api/v1/devices/{id}/messages/search:
  *   get:
- *     summary: Search messages across chats
- *     tags: [Messages]
+ *     summary: Search messages across chats with enhanced media details
+ *     description: |
+ *       Search for messages across all chats or within a specific chat.
+ *       Returns enhanced message objects with complete media information including:
+ *       - Download URLs for media files
+ *       - Media metadata (type, duration, dimensions)
+ *       - Location details for location messages
+ *       - Quoted message information for replies
+ *       - Message reactions and other metadata
+ *     tags: [Messages, Media]
  *     parameters:
  *       - in: path
  *         name: id
@@ -212,22 +220,41 @@ router.post('/delete',
  *         required: true
  *         schema:
  *           type: string
- *         description: Search query
+ *         description: Search query text
+ *         example: "photo"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 50
  *           maximum: 100
- *         description: Maximum results
+ *           minimum: 1
+ *         description: Maximum number of results to return
  *       - in: query
  *         name: chatId
  *         schema:
  *           type: string
- *         description: Optional chat ID to search within
+ *         description: Optional chat ID to search within specific chat
+ *         example: "923009401404@c.us"
  *     responses:
  *       200:
- *         description: Search results
+ *         description: Search results with enhanced message details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MediaSearchResponse'
+ *       400:
+ *         description: Invalid search query
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Device not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/search', MessageController.searchMessages);
 

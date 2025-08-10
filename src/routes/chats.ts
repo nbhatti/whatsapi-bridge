@@ -290,7 +290,7 @@ router.post('/:chatId/unarchive', validate(schemas.chatId, 'params'), ChatContro
  * @swagger
  * /api/v1/devices/{id}/chats/{chatId}/messages:
  *   get:
- *     summary: Fetch messages from a chat
+ *     summary: Fetch messages from a chat with cursor-based pagination
  *     tags: [Chats, Messages]
  *     parameters:
  *       - in: path
@@ -304,28 +304,30 @@ router.post('/:chatId/unarchive', validate(schemas.chatId, 'params'), ChatContro
  *         required: true
  *         schema:
  *           type: string
- *         description: Chat ID
+ *         description: Chat ID (e.g., "923009401404@c.us")
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           minimum: 1
  *           maximum: 100
- *           default: 50
+ *           default: 20
  *         description: Number of messages to fetch
  *       - in: query
  *         name: before
  *         schema:
  *           type: string
- *         description: Fetch messages before this message ID
+ *         description: Fetch messages before this message ID (older messages)
+ *         example: "false_923009401404@c.us_MESSAGE_ID_HERE"
  *       - in: query
  *         name: after
  *         schema:
  *           type: string
- *         description: Fetch messages after this message ID
+ *         description: Fetch messages after this message ID (newer messages)
+ *         example: "false_923009401404@c.us_MESSAGE_ID_HERE"
  *     responses:
  *       200:
- *         description: Messages fetched successfully
+ *         description: Messages fetched successfully with pagination info
  *         content:
  *           application/json:
  *             schema:
@@ -338,6 +340,56 @@ router.post('/:chatId/unarchive', validate(schemas.chatId, 'params'), ChatContro
  *                   type: array
  *                   items:
  *                     type: object
+ *                     description: WhatsApp message object
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: Total messages in filtered set
+ *                     returned:
+ *                       type: integer
+ *                       description: Number of messages returned
+ *                     requestedLimit:
+ *                       type: integer
+ *                       description: Requested limit
+ *                     hasMore:
+ *                       type: boolean
+ *                       description: Whether more messages are available
+ *                     referenceFound:
+ *                       type: boolean
+ *                       description: Whether the reference message was found (for before/after)
+ *                     referenceType:
+ *                       type: string
+ *                       enum: [before, after, null]
+ *                       description: Type of reference used
+ *                     referenceId:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Message ID used as reference
+ *                     cursors:
+ *                       type: object
+ *                       properties:
+ *                         newer:
+ *                           type: object
+ *                           nullable: true
+ *                           properties:
+ *                             after:
+ *                               type: string
+ *                               description: Message ID to use for getting newer messages
+ *                             url:
+ *                               type: string
+ *                               description: Ready-to-use URL for fetching newer messages
+ *                         older:
+ *                           type: object
+ *                           nullable: true
+ *                           properties:
+ *                             before:
+ *                               type: string
+ *                               description: Message ID to use for getting older messages
+ *                             url:
+ *                               type: string
+ *                               description: Ready-to-use URL for fetching older messages
  *       404:
  *         description: Device or chat not found
  *       500:
@@ -397,6 +449,76 @@ router.post('/:chatId/messages/forward',
   validate(schemas.forwardMessage, 'body'),
   ChatController.forwardMessage
 );
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/chats/search:
+ *   get:
+ *     summary: Search for chats with simplified response format
+ *     tags: [Chats]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search query (name, phone number, or message content)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 10
+ *         description: Number of results to return
+ *     responses:
+ *       200:
+ *         description: Search results with chat IDs and names
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 query:
+ *                   type: string
+ *                   example: "Wife"
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "923009401404@c.us"
+ *                       name:
+ *                         type: string
+ *                         example: "Wife"
+ *                       type:
+ *                         type: string
+ *                         enum: [private, group]
+ *                       unread:
+ *                         type: integer
+ *                         example: 1
+ *                       lastMessage:
+ *                         type: string
+ *                         example: "Hello there"
+ *       400:
+ *         description: Missing search query
+ *       404:
+ *         description: Device not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/search', validate(schemas.searchChats, 'query'), ChatController.searchChats);
 
 /**
  * @swagger

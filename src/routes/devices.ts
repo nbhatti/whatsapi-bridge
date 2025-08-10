@@ -7,6 +7,7 @@ import groupRoutes from './groups';
 import chatRoutes from './chats';
 import analyticsRoutes from './analytics';
 import mentionsGroupsRoutes from './mentions-groups';
+import mediaRoutes from './media';
 
 const router = Router();
 
@@ -80,11 +81,13 @@ router.use('/:id/chats', chatRoutes);
 // Messages - All message operations with queue reliability, advanced features, and management
 router.use('/:id/messages', messageRoutes);
 
+// Media routes - Download and manage media files from messages
+router.use('/:id/messages', mediaRoutes);
+
 // Group routes for each device
 router.use('/:id/groups', groupRoutes);
 
 // Mentions and Groups functionality
-import mentionsGroupsRoutes from './mentions-groups';
 router.use('/:id', mentionsGroupsRoutes);
 
 // Analytics routes for each device
