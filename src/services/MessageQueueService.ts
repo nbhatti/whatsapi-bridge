@@ -2,6 +2,7 @@ import { getRedisClient } from '../config/redis';
 import logger, { logInfo, logError, logWarn } from '../config/logger';
 import { DeviceManager } from './DeviceManager';
 import { MessageMedia, MessageSendOptions } from 'whatsapp-web.js';
+import { redactMessageContent, redactPhoneNumber, getMessageLogMetadata } from '../utils/logSanitizer';
 
 export interface QueuedMessage {
   id: string;
@@ -285,17 +286,20 @@ export class MessageQueueService {
       await this.redisClient.set(`${this.DEVICE_LAST_MESSAGE_KEY}:${message.deviceId}`, Date.now().toString());
       await this.incrementDeviceMessageCount(message.deviceId);
 
-      logInfo(`Message sent successfully: ${message.id} to ${message.to} from device ${this.deviceManager.getFormattedDeviceId(message.deviceId)} | Type: ${message.type} | Content: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`);
+      const messageMetadata = getMessageLogMetadata(message.content, message.type);
+      logInfo(`Message sent successfully: ${message.id} to ${redactPhoneNumber(message.to)} from device ${this.deviceManager.getFormattedDeviceId(message.deviceId)} | Type: ${messageMetadata.type} | Length: ${messageMetadata.length} chars`);
       
     } catch (error: any) {
-      logError(`Failed to send message ${message.id} to ${message.to}:`, {
+      const messageMetadata = getMessageLogMetadata(message.content, message.type);
+      logError(`Failed to send message ${message.id} to ${redactPhoneNumber(message.to)}:`, {
         error: error.message,
         stack: error.stack,
         messageId: message.id,
         deviceId: message.deviceId,
-        to: message.to,
-        type: message.type,
-        content: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '')
+        to: redactPhoneNumber(message.to),
+        type: messageMetadata.type,
+        contentLength: messageMetadata.length,
+        hasContent: messageMetadata.hasContent
       });
       
       // Retry logic
