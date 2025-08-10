@@ -18,6 +18,7 @@ Developed by **[yLinx](https://ylinx.pk)** - A leading IT consulting and cloud s
 ## 🌟 Features
 
 - 🔌 **REST API Bridge** for WhatsApp Web.js
+- 🔍 **🆕 Smart Chat Search** - Find Chat IDs easily with helper script and search API
 - 🤖 **AI Integration** for intelligent messaging
 - 📱 **Multi-Device Support** with QR code authentication
 - 💬 **Complete Messaging Suite** (text, media, documents, locations)
@@ -52,6 +53,9 @@ Developed by **[yLinx](https://ylinx.pk)** - A leading IT consulting and cloud s
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[📚 Documentation Index](docs/documentation-index.md)** - Complete documentation guide
+- **[🔍 Chat Search & Quick Start](docs/QUICKSTART_CHAT_SEARCH.md)** - **🆕 NEW!** Find Chat IDs & send messages in 5 minutes
+- **[💬 Chat Management Guide](docs/CHAT_MANAGEMENT.md)** - **🆕 NEW!** Complete chat search & management
+- **[📋 API Guide](docs/API_GUIDE.md)** - Complete API reference with examples
 - **[🚀 Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in minutes
 - **[🔧 Installation Guide](docs/INSTALLATION.md)** - Comprehensive installation instructions
 - **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
@@ -203,8 +207,34 @@ The API is comprehensively documented using **Swagger UI** with interactive endp
 - 📱 **Devices** - Multi-device support and authentication
 - 👥 **Groups** - Group creation and management
 - 📤 **Messages** - Send and receive various message types
+- 🔌 **WebSocket** - Real-time Socket.IO gateway for device events
 - ✅ **Examples** - Ready-to-use API examples
 - 🔧 **Validation** - Input validation examples
+
+### 🔌 Real-time WebSocket Gateway
+
+The API includes a comprehensive Socket.IO WebSocket gateway for real-time device events:
+
+- **📡 Real-time Updates** - QR codes, authentication status, messages
+- **🔐 Secure Authentication** - API key-based WebSocket authentication
+- **📱 Device Namespaces** - Isolated channels per WhatsApp device
+- **⚡ Event Streaming** - Live message reception and device state changes
+
+**Quick WebSocket Example:**
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000/device/your-device-id', {
+  path: '/ws',
+  query: { apiKey: 'your-api-key' }
+});
+
+socket.on('qr', (data) => console.log('QR Code:', data.qr));
+socket.on('authenticated', (data) => console.log('Ready!', data.phoneNumber));
+socket.on('message', (data) => console.log('New message:', data.message));
+```
+
+📖 **[Complete WebSocket Documentation](docs/WEBSOCKET_GATEWAY.md)** - Detailed setup, events, and troubleshooting
 
 ## 🐳 Docker Deployment
 

@@ -18,7 +18,9 @@ Welcome to the WhatsApp Web.js REST API Wrapper documentation. This directory co
 
 ## 🚀 API Documentation
 
-- [API Guide](API_GUIDE.md) - Complete API reference
+- [API Guide](API_GUIDE.md) - Complete API reference with chat search
+- [Chat Management Guide](CHAT_MANAGEMENT.md) - **NEW!** Find Chat IDs easily and manage chats
+- [Message Pagination Guide](MESSAGE_PAGINATION.md) - **NEW!** Enhanced message fetching with cursor pagination
 - [Unified Messaging API](UNIFIED_MESSAGING_API.md) - Messaging API endpoints
 - [Contact Routes](CONTACT_ROUTES.md) - Contact management endpoints
 - [Group Routes](GROUP_ROUTES.md) - Group management endpoints

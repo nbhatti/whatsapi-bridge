@@ -6,7 +6,7 @@ This document describes the WebSocket (Socket.io) gateway implementation that pr
 
 The WebSocket gateway is implemented using Socket.io and provides:
 - Real-time device events (QR codes, authentication status, messages, etc.)
-- Device-specific namespaces (`/device/:id`)
+- Device-specific namespaces (`/device/:deviceId`)
 - API key authentication for WebSocket connections
 - Events for: `qr`, `ready`, `authenticated`, `message`, `state`, `disconnected`
 
@@ -16,16 +16,31 @@ The WebSocket gateway is implemented using Socket.io and provides:
 The WebSocket server is available at `/ws` path on the same HTTP server.
 
 ### Authentication
-All WebSocket connections require API key authentication via query parameter:
-```
-?apiKey=your-api-key-here
+All WebSocket connections require API key authentication via query parameter. The API key must match the one configured in your `.env` file:
+
+```bash
+# In your .env file
+API_KEY=your-super-secure-api-key-change-this-immediately
 ```
 
+Then use it in the connection:
+```
+?apiKey=your-super-secure-api-key-change-this-immediately
+```
+
+⚠️ **Security Note**: Never expose your API key in client-side code in production. Consider using a backend proxy for WebSocket connections in production environments.
+
 ### Device Namespace
-Each device has its own namespace following the pattern `/device/:deviceId`:
+Each device has its own namespace following the pattern `/device/:deviceId` where `deviceId` is a UUID generated when creating a WhatsApp device session:
+
 ```
-/device/12345678-1234-1234-1234-123456789abc
+# Real device ID examples (UUIDs)
+/device/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+/device/device-123e4567-e89b-12d3-a456-426614174000
+/device/my-whatsapp-session-uuid-here
 ```
+
+**Device ID Format**: Device IDs are typically UUIDs (v4) but can be any alphanumeric string you specify when creating a device via the REST API.
 
 ## Client Connection Example
 
@@ -257,6 +272,112 @@ If the API key is missing or invalid, the connection will be rejected with an er
 - Consider implementing additional authentication layers for production use
 - The WebSocket connection inherits CORS settings from the main server configuration
 
+## Testing & Troubleshooting
+
+### Connection Testing
+
+1. **Test Socket.IO Endpoint**:
+   ```bash
+   curl -s http://localhost:3000/ws/socket.io/
+   # Expected response: {"code":0,"message":"Transport unknown"}
+   ```
+
+2. **Test with Real API Key**:
+   ```bash
+   # Check your current API key
+   grep API_KEY .env
+   ```
+
+3. **Basic Connection Test** (Node.js):
+   ```javascript
+   const { io } = require('socket.io-client');
+   
+   const socket = io('http://localhost:3000/device/test-device-123', {
+     path: '/ws',
+     query: { apiKey: process.env.API_KEY || 'your-api-key' }
+   });
+   
+   socket.on('connect', () => console.log('Connected!'));
+   socket.on('connect_error', (err) => console.error('Failed:', err.message));
+   ```
+
+### Common Issues
+
+#### Connection Refused
+- **Problem**: `ECONNREFUSED` or connection timeout
+- **Solution**: Ensure the server is running on the correct port (default: 3000)
+
+#### Authentication Failed
+- **Problem**: `Invalid API key` error
+- **Solution**: 
+  1. Check your `.env` file contains `API_KEY=your-actual-key`
+  2. Ensure the key matches exactly (no extra spaces)
+  3. Restart the server after changing the API key
+
+#### Transport Unknown
+- **Problem**: Server responds with "Transport unknown"
+- **Solution**: This is normal for direct HTTP requests. Use a Socket.IO client instead.
+
+#### Device Namespace Not Found
+- **Problem**: Cannot connect to device namespace
+- **Solution**: Ensure the device exists by creating it via REST API first:
+  ```bash
+  curl -X POST -H "X-API-KEY: your-api-key" \
+       -H "Content-Type: application/json" \
+       -d '{"name":"My Device","id":"test-device-123"}' \
+       http://localhost:3000/api/devices
+  ```
+
+### Environment Configuration
+
+Ensure your `.env` file has the correct WebSocket settings:
+
+```bash
+# Socket.IO Configuration
+CORS_ORIGIN=http://localhost:3000
+SOCKET_IO_CORS_ORIGIN=http://localhost:3000
+
+# Security
+API_KEY=your-super-secure-api-key-change-this-immediately
+
+# Server
+PORT=3000
+NODE_ENV=development
+```
+
+### Debug Mode
+
+Enable debug logging for Socket.IO:
+
+```bash
+# Server-side debugging
+DEBUG=socket.io:* npm start
+
+# Client-side debugging (browser)
+localStorage.debug = 'socket.io-client:*';
+```
+
 ## Scaling
 
 The WebSocket gateway supports Redis adapter for horizontal scaling across multiple server instances. This is automatically enabled in production mode when Redis is configured.
+
+### Redis Configuration for Scaling
+
+```bash
+# Enable Redis adapter in production
+REDIS_URL=redis://localhost:6379
+NODE_ENV=production
+```
+
+### Load Balancing
+
+When using multiple server instances behind a load balancer, ensure:
+- Sticky sessions are enabled (same client always connects to same server)
+- OR Redis adapter is configured for cross-server communication
+
+## Performance Considerations
+
+- **Connection Limits**: Default limit is ~1000 concurrent connections per server instance
+- **Message Rate**: Device-specific rate limiting applies (10 messages/minute by default)
+- **Memory Usage**: Each connection uses ~2-5MB of memory
+- **Redis Scaling**: Use Redis for production setups with multiple server instances

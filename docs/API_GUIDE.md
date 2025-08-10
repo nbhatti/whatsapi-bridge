@@ -1,10 +1,81 @@
-# WhatsApp Messages API Guide
+# WhatsApp API Guide
 
 ## 🚀 Overview
 
-This is a clean, unified WhatsApp messaging API that combines reliability, advanced features, and complete message management in one system.
+This is a clean, unified WhatsApp API that combines reliability, advanced features, and complete message and chat management in one system.
 
-## 🎯 Core Endpoints
+## 🔍 Finding Chat IDs (Important!)
+
+Before sending messages, you need to find the correct Chat ID. WhatsApp uses specific ID formats:
+- **Individual chats**: `923009401404@c.us`
+- **Groups**: `923009401404-1234567890@g.us`
+
+### **Method 1: Helper Script (Recommended)**
+```bash
+# Make it executable once
+chmod +x ./find-chat.sh
+
+# Search by name or phone number
+./find-chat.sh "Wife"
+./find-chat.sh "923009401404"
+./find-chat.sh "Project Team"
+```
+
+### **Method 2: Chat Search API**
+```
+GET /api/v1/devices/{deviceId}/chats/search?q={searchTerm}
+```
+
+**Example:**
+```bash
+curl -X GET "http://localhost:3000/api/v1/devices/device123/chats/search?q=Wife&limit=5" \
+  -H "x-api-key: your-api-key" | jq
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "query": "Wife",
+  "found": 1,
+  "results": [
+    {
+      "id": "923009401404@c.us",
+      "name": "Wife",
+      "type": "private",
+      "unread": 1,
+      "lastMessage": "Hello there",
+      "getDetailsUrl": "/api/v1/devices/device123/chats/923009401404@c.us"
+    }
+  ]
+}
+```
+
+### **Method 3: List All Chats with Search**
+```
+GET /api/v1/devices/{deviceId}/chats?search={term}&summary=true
+```
+
+## 💬 Chat Management
+
+### **Get Chat Details**
+```
+GET /api/v1/devices/{deviceId}/chats/{chatId}
+```
+
+### **List All Chats**
+```
+GET /api/v1/devices/{deviceId}/chats
+```
+
+### **Search Chats**
+```
+GET /api/v1/devices/{deviceId}/chats?search={term}&filter={type}&limit={count}
+```
+
+Filters: `all`, `unread`, `groups`, `private`, `archived`
+
+## 🎯 Message Endpoints
 
 ### **Send Messages**
 ```
@@ -44,18 +115,20 @@ GET /api/v1/devices/{deviceId}/messages/status
 ```json
 POST /api/v1/devices/device123/messages/send
 {
-  "to": "1234567890",
+  "to": "923009401404@c.us",
   "text": "Hello World!",
   "useQueue": true,
   "priority": "normal"
 }
 ```
 
+⚠️ **Important**: Always use the full Chat ID format (`923009401404@c.us`), not just the phone number!
+
 ### **Media Message with Caption**
 ```json
 POST /api/v1/devices/device123/messages/send
 {
-  "to": "1234567890",
+  "to": "923009401404@c.us",
   "text": "Check this photo!",
   "media": {
     "mimetype": "image/jpeg",
@@ -70,7 +143,7 @@ POST /api/v1/devices/device123/messages/send
 ```json
 POST /api/v1/devices/device123/messages/send
 {
-  "to": "1234567890",
+  "to": "923009401404@c.us",
   "location": {
     "latitude": 40.7128,
     "longitude": -74.0060,
@@ -81,11 +154,22 @@ POST /api/v1/devices/device123/messages/send
 }
 ```
 
+### **Send Location via Chat Route (Alternative)**
+```json
+POST /api/v1/devices/device123/chats/location
+{
+  "to": "923009401404@c.us",
+  "latitude": 40.7128,
+  "longitude": -74.0060,
+  "description": "Times Square, New York"
+}
+```
+
 ### **Reply to Message**
 ```json
 POST /api/v1/devices/device123/messages/send
 {
-  "to": "1234567890",
+  "to": "923009401404@c.us",
   "text": "Great idea!",
   "quotedMessageId": "message_id_to_reply_to",
   "useQueue": true
@@ -96,10 +180,19 @@ POST /api/v1/devices/device123/messages/send
 ```json
 POST /api/v1/devices/device123/messages/send
 {
-  "to": "group_chat_id",
+  "to": "923001234567-1642634400@g.us",
   "text": "Hello @John and @Jane!",
-  "mentions": ["1234567890", "0987654321"],
+  "mentions": ["923001234567@c.us", "923007654321@c.us"],
   "useQueue": true
+}
+```
+
+### **Send Message via Chat Route (Alternative)**
+```json
+POST /api/v1/devices/device123/chats
+{
+  "to": "923009401404@c.us",
+  "text": "Hello from chat route!"
 }
 ```
 
