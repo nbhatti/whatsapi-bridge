@@ -22,7 +22,11 @@ const swaggerDefinition = {
   servers: [
     {
       url: `/api`,
-      description: 'Development server',
+      description: 'REST API base path',
+    },
+    {
+      url: `/`,
+      description: 'Root server (WebSocket path \/ws lives here)',
     },
   ],
   tags: [
@@ -63,12 +67,20 @@ const swaggerDefinition = {
       description: 'Unified message operations with queue reliability, advanced features, and complete message management. Supports text, media, location, forwarding, search, and status monitoring.',
     },
     {
+      name: 'Media',
+      description: 'Media file management including downloads, thumbnails, and media information. Supports images, videos, audio, documents, and stickers with comprehensive metadata.',
+    },
+    {
       name: 'Queue Management',
       description: 'Message queue monitoring, configuration, and health management.',
     },
     {
       name: 'Device Health',
       description: 'Device health monitoring, safety checks, and warmup management.',
+    },
+    {
+      name: 'WebSocket',
+      description: 'Real-time Socket.IO gateway for device events and status updates.',
     },
   ],
   components: {

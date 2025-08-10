@@ -9,6 +9,8 @@ const swaggerOptions = {
   apis: [
     './src/routes/**/*.ts',
     './src/config/validation.ts', // Include validation schemas
+    './src/config/mediaSchemas.ts', // Include media schemas
+    './src/config/socketSchemas.ts', // Include websocket/socket schemas
   ],
 };
 
@@ -26,13 +28,22 @@ const customCss = `
 
 // Setup Swagger middleware
 export const setupSwagger = (app: Application): void => {
+  // Serve the raw OpenAPI/Swagger JSON specification
+  app.get('/docs-json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for tools
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.json(swaggerSpec);
+  });
+
+  // Serve the Swagger UI documentation
   app.use(
     '/docs',
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
       customCss,
       customSiteTitle: 'WhatsApp Web.js API Docs',
-      customfavIcon: '/static/favicon.ico', // Example: add a favicon
+      customfavIcon: '/static/favicon.ico',
       swaggerOptions: {
         tagsSorter: 'alpha', // Sort tags alphabetically
         operationsSorter: 'alpha', // Sort operations alphabetically within each tag
@@ -40,10 +51,15 @@ export const setupSwagger = (app: Application): void => {
         filter: true, // Enable search filter
         showExtensions: true,
         showCommonExtensions: true,
+        url: '/docs-json', // Point to our JSON endpoint
       },
     })
   );
 
   console.log(`Swagger docs available at http://localhost:${process.env.PORT || 3000}/docs`);
+  console.log(`OpenAPI JSON spec available at http://localhost:${process.env.PORT || 3000}/docs-json`);
 };
+
+// Export the swagger specification for external use
+export { swaggerSpec };
 

@@ -41,8 +41,8 @@ export const initializeSocketIO = (httpServer: HttpServer): SocketIOServer => {
   }
 
   // Connection handling
-  // Register the device namespace
-  const deviceNamespace = io.of(/^\/device\/\w+$/);
+  // Register the device namespace (supports UUIDs with hyphens)
+  const deviceNamespace = io.of(/^\/device\/[\w-]+$/);
 
   // Middleware for API key authentication on the device namespace
   deviceNamespace.use(socketAuth);

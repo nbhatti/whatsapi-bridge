@@ -131,6 +131,11 @@ export const schemas = {
     customQuery: Joi.string().min(10).max(1000).optional(),
   }),
 
+  searchChats: Joi.object({
+    q: Joi.string().required().min(1).max(100),
+    limit: Joi.number().integer().min(1).max(50).default(10),
+  }),
+
   // Unified Message Schemas
   sendUnifiedMessage: Joi.object({
     to: Joi.string().required(),
