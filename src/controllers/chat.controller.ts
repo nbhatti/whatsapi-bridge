@@ -9,6 +9,7 @@ import {
   cacheChatDetail, 
   CachedChat 
 } from '../services/chatCache';
+import { formatMessages } from '../utils/messageFormatter';
 
 export const listChats = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -81,11 +82,12 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
       const searchLower = search.toLowerCase();
       chats = chats.filter(chat => {
         // Search by name
-        const name = (chat.name || chat.id.user || '').toLowerCase();
+        const name = (chat.name || '').toLowerCase();
         if (name.includes(searchLower)) return true;
         
         // Search by phone number (for individual chats)
-        if (!chat.isGroup && chat.id.user && chat.id.user.includes(search)) return true;
+        const chatId = chat.id; // Already normalized in cache or fresh data processing
+        if (!chat.isGroup && chatId && chatId.includes(search)) return true;
         
         // Search in last message body
         if (chat.lastMessage?.body && chat.lastMessage.body.toLowerCase().includes(searchLower)) {
@@ -122,8 +124,8 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
       // Return summary format with just essential info
       const limitNumber = typeof limit === 'string' ? parseInt(limit) : ((limit as unknown) as number) || 20;
       const chatSummary = chats.slice(0, limitNumber).map(chat => ({
-        id: chat.id._serialized,
-        name: chat.name || chat.id.user || 'Unknown',
+        id: chat.id, // Already normalized
+        name: chat.name || 'Unknown',
         isGroup: chat.isGroup,
         unreadCount: chat.unreadCount,
         lastMessage: {
@@ -171,7 +173,7 @@ export const listChats = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to list chats',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as any).message : undefined
     });
   }
 };
@@ -221,12 +223,124 @@ export const fetchMessages = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    const { limit, before, after } = req.query;
+    const requestedLimit = Number(limit) || 20;
+    
+    // WhatsApp Web.js fetchMessages only supports limit and fromMe
+    // For pagination, we need to fetch more messages and filter them
+    let fetchLimit = requestedLimit;
+    
+    // If we have before/after, we need to fetch more messages to find the reference point
+    if (before || after) {
+      // Fetch up to 3x the requested limit to have room for filtering
+      // This is a reasonable balance between performance and functionality
+      fetchLimit = Math.min(requestedLimit * 3, 300);
+    }
+
     const chat = await device.client.getChatById(req.params.chatId);
-    const messages = await chat.fetchMessages({ limit: Number(req.query.limit) || 20 });
-    res.json({ success: true, data: messages });
+    const allMessages = await chat.fetchMessages({ limit: fetchLimit });
+    
+    let filteredMessages = allMessages;
+    let foundReferenceIndex = -1;
+    
+    // Apply before filter (messages before the specified message ID)
+    if (before && typeof before === 'string') {
+      foundReferenceIndex = allMessages.findIndex(msg => msg.id._serialized === before);
+      if (foundReferenceIndex !== -1) {
+        // Get messages before the reference message (older messages)
+        filteredMessages = allMessages.slice(foundReferenceIndex + 1);
+      } else {
+        // Reference message not found, return empty result with info
+        res.json({ 
+          success: true, 
+          data: [],
+          pagination: {
+            total: 0,
+            returned: 0,
+            requestedLimit,
+            hasMore: false,
+            referenceFound: false,
+            referenceType: 'before',
+            referenceId: before
+          }
+        });
+        return;
+      }
+    }
+    
+    // Apply after filter (messages after the specified message ID)
+    if (after && typeof after === 'string') {
+      foundReferenceIndex = filteredMessages.findIndex(msg => msg.id._serialized === after);
+      if (foundReferenceIndex !== -1) {
+        // Get messages after the reference message (newer messages)
+        filteredMessages = filteredMessages.slice(0, foundReferenceIndex);
+      } else {
+        // Reference message not found, return empty result with info
+        res.json({ 
+          success: true, 
+          data: [],
+          pagination: {
+            total: 0,
+            returned: 0,
+            requestedLimit,
+            hasMore: false,
+            referenceFound: false,
+            referenceType: 'after',
+            referenceId: after
+          }
+        });
+        return;
+      }
+    }
+    
+    // Apply limit
+    const limitedMessages = filteredMessages.slice(0, requestedLimit);
+    
+    // Format messages with enhanced details including media information
+    const formattedMessages = await formatMessages(limitedMessages, req.params.id);
+    
+    // Determine if there are more messages available
+    const hasMore = filteredMessages.length > requestedLimit || 
+                    (fetchLimit === 300 && allMessages.length === 300); // Hit our fetch limit
+    
+    // Generate pagination cursors for next requests
+    const firstMessage = limitedMessages[0];
+    const lastMessage = limitedMessages[limitedMessages.length - 1];
+    
+    const pagination = {
+      total: filteredMessages.length,
+      returned: formattedMessages.length,
+      requestedLimit,
+      hasMore,
+      referenceFound: before || after ? foundReferenceIndex !== -1 : true,
+      referenceType: before ? 'before' : after ? 'after' : null,
+      referenceId: (before || after) as string || null,
+      cursors: {
+        // For getting newer messages (use 'after' with first message ID)
+        newer: firstMessage ? {
+          after: firstMessage.id._serialized,
+          url: `/api/v1/devices/${req.params.id}/chats/${req.params.chatId}/messages?limit=${requestedLimit}&after=${firstMessage.id._serialized}`
+        } : null,
+        // For getting older messages (use 'before' with last message ID)
+        older: lastMessage && hasMore ? {
+          before: lastMessage.id._serialized,
+          url: `/api/v1/devices/${req.params.id}/chats/${req.params.chatId}/messages?limit=${requestedLimit}&before=${lastMessage.id._serialized}`
+        } : null
+      }
+    };
+    
+    res.json({ 
+      success: true, 
+      data: formattedMessages,
+      pagination
+    });
   } catch (error) {
     logger.error('Error fetching messages:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch messages' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch messages',
+      details: process.env.NODE_ENV === 'development' ? (error as any).message : undefined
+    });
   }
 };
 
@@ -545,5 +659,119 @@ export const deleteMessage = async (req: Request, res: Response): Promise<void> 
   } catch (error) {
     logger.error('Error deleting message:', error);
     res.status(500).json({ success: false, error: 'Failed to delete message' });
+  }
+};
+
+/**
+ * Search for chats with simplified response format
+ */
+export const searchChats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceManager = DeviceManager.getInstance();
+    const device = deviceManager.getDevice(req.params.id);
+    if (!device) {
+      res.status(404).json({ success: false, error: 'Device not found' });
+      return;
+    }
+
+    if (device.status !== 'ready') {
+      res.status(400).json({ 
+        success: false, 
+        error: `Device is not ready. Current status: ${device.status}`,
+        currentStatus: device.status
+      });
+      return;
+    }
+
+    const { q: query, limit } = req.query;
+    
+    if (!query || typeof query !== 'string') {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Search query (q) is required' 
+      });
+      return;
+    }
+
+    // Use the existing listChats logic but with simplified response
+    const { summary, filter, search, force_refresh } = {
+      summary: false,
+      filter: 'all',
+      search: query,
+      force_refresh: false
+    };
+    
+    let chats: any[] = [];
+    
+    // Try to get from cache first
+    const cachedChatList = await getCachedChatList(req.params.id);
+    
+    if (cachedChatList) {
+      chats = cachedChatList.chats;
+    } else {
+      // Get fresh data from WhatsApp
+      const freshChats = await device.client.getChats();
+      
+      // Cache the fresh data
+      await cacheChatList(req.params.id, freshChats);
+      
+      // Convert to our format
+      chats = freshChats.map(chat => ({
+        id: chat.id._serialized,
+        name: chat.name || chat.id.user || 'Unknown',
+        isGroup: chat.isGroup,
+        unreadCount: chat.unreadCount,
+        timestamp: chat.timestamp,
+        archived: chat.archived || false,
+        pinned: chat.pinned || false,
+        muted: chat.isMuted || false,
+        lastMessage: chat.lastMessage || null,
+      }));
+    }
+    
+    // Apply search filter
+    const searchLower = query.toLowerCase();
+    const filteredChats = chats.filter(chat => {
+      // Search by name
+      const name = (chat.name || '').toLowerCase();
+      if (name.includes(searchLower)) return true;
+      
+      // Search by phone number (for individual chats)
+      const chatId = chat.id;
+      if (!chat.isGroup && chatId && chatId.includes(query)) return true;
+      
+      // Search in last message body
+      if (chat.lastMessage?.body && chat.lastMessage.body.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+      
+      return false;
+    });
+    
+    const limitNumber = typeof limit === 'string' ? parseInt(limit) : 10;
+    const results = filteredChats.slice(0, limitNumber).map(chat => ({
+      id: chat.id,
+      name: chat.name || 'Unknown',
+      type: chat.isGroup ? 'group' : 'private',
+      unread: chat.unreadCount || 0,
+      lastMessage: chat.lastMessage?.body || null,
+      timestamp: chat.timestamp || null,
+      getDetailsUrl: `/api/v1/devices/${req.params.id}/chats/${encodeURIComponent(chat.id)}`
+    }));
+    
+    res.json({
+      success: true,
+      query: query,
+      found: results.length,
+      total: filteredChats.length,
+      results: results
+    });
+  } catch (error) {
+    logger.error('Error searching chats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to search chats',
+      details: process.env.NODE_ENV === 'development' ? (error as any).message : undefined
+    });
   }
 };

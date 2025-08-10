@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { MessageMedia, MessageSendOptions, Location } from 'whatsapp-web.js';
 import { DeviceManager, MessageQueueService, DeviceHealthService } from '../services';
 import { logError, logInfo } from '../config/logger';
+import { formatMessages } from '../utils/messageFormatter';
 
 const deviceManager = DeviceManager.getInstance();
 const messageQueueService = MessageQueueService.getInstance();
@@ -122,7 +123,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       const messageId = await messageQueueService.queueMessage({
         deviceId: id,
         to: formattedTo,
-        type: messageType,
+        type: messageType === 'location' ? 'media' : messageType, // Convert location to media for queue
         content: messageContent,
         mediaBase64: mediaData,
         mediaType: mediaType,
@@ -396,14 +397,24 @@ export const searchMessages = async (req: Request, res: Response): Promise<void>
       
       for (const message of messages) {
         if (message.body && message.body.toLowerCase().includes(queryLower)) {
+          // Format the message with media details
+          const formattedMessages = await formatMessages([message], id);
+          const formattedMessage = formattedMessages[0];
+          
           searchResults.push({
-            messageId: message.id._serialized,
+            messageId: formattedMessage.id,
             chatId: chat.id._serialized,
             chatName: chat.name || chat.id.user || 'Unknown',
-            body: message.body,
-            timestamp: message.timestamp,
-            fromMe: message.fromMe,
-            type: message.type
+            body: formattedMessage.body,
+            timestamp: formattedMessage.timestamp,
+            fromMe: formattedMessage.fromMe,
+            type: formattedMessage.type,
+            hasMedia: formattedMessage.hasMedia,
+            mediaInfo: formattedMessage.mediaInfo,
+            location: formattedMessage.location,
+            quotedMessage: formattedMessage.quotedMessage,
+            isForwarded: formattedMessage.isForwarded,
+            isStarred: formattedMessage.isStarred
           });
           
           if (searchResults.length >= searchLimit) break;
@@ -421,14 +432,24 @@ export const searchMessages = async (req: Request, res: Response): Promise<void>
           
           for (const message of messages) {
             if (message.body && message.body.toLowerCase().includes(queryLower)) {
+              // Format the message with media details
+              const formattedMessages = await formatMessages([message], id);
+              const formattedMessage = formattedMessages[0];
+              
               searchResults.push({
-                messageId: message.id._serialized,
+                messageId: formattedMessage.id,
                 chatId: chat.id._serialized,
                 chatName: chat.name || chat.id.user || 'Unknown',
-                body: message.body,
-                timestamp: message.timestamp,
-                fromMe: message.fromMe,
-                type: message.type
+                body: formattedMessage.body,
+                timestamp: formattedMessage.timestamp,
+                fromMe: formattedMessage.fromMe,
+                type: formattedMessage.type,
+                hasMedia: formattedMessage.hasMedia,
+                mediaInfo: formattedMessage.mediaInfo,
+                location: formattedMessage.location,
+                quotedMessage: formattedMessage.quotedMessage,
+                isForwarded: formattedMessage.isForwarded,
+                isStarred: formattedMessage.isStarred
               });
               
               if (searchResults.length >= searchLimit) break;
