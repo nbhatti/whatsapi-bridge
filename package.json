@@ -65,7 +65,9 @@
     "release:minor": "npm run build && npm run test && npm version minor && git push --follow-tags",
     "release:major": "npm run build && npm run test && npm version major && git push --follow-tags",
     "changelog": "git log --oneline --decorate --graph",
-    "prepare:release": "npm run clean && npm run build && npm run test && npm run security:check"
+    "prepare:release": "npm run clean && npm run build && npm run test && npm run security:check",
+    "swagger:update": "node scripts/update-swagger.js",
+    "test:websocket": "node test-websocket-connection.js"
   },
   "keywords": [
     "whatsapp",
