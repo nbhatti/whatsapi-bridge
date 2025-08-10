@@ -1,0 +1,25 @@
+# Development Dockerfile for local development
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies needed for native modules
+RUN apk add --no-cache libc6-compat python3 make g++
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Expose the port
+EXPOSE 4000
+
+# Start development server with hot-reload
+CMD ["npm", "run", "dev"]

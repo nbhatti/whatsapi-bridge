@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  cypress:
+    image: cypress/included:13.18.0
+    container_name: whatsapp-frontend-cypress
+    depends_on:
+      - frontend-test
+    environment:
+      - CYPRESS_baseUrl=http://frontend-test:4000
+      - CYPRESS_TEST_USER_EMAIL=test@example.com
+      - CYPRESS_TEST_USER_PASSWORD=testPassword123
+    working_dir: /e2e
+    volumes:
+      - .:/e2e
+    command: cypress run --browser electron --headless
+    networks:
+      - test-network
+
+  frontend-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-frontend-test
+    ports:
+      - "4001:4000"
+    environment:
+      - NODE_ENV=test
+      - DATABASE_URL=postgresql://postgres:password@test-db:5432/whatsapp_test
+      - JWT_SECRET=test-jwt-secret-key-for-testing
+      - NEXTAUTH_SECRET=test-nextauth-secret-for-testing
+      - NEXTAUTH_URL=http://localhost:4001
+    depends_on:
+      - test-db
+    command: >
+      sh -c "
+        npx prisma migrate dev --name init &&
+        npm run start
+      "
+    networks:
+      - test-network
+
+  test-db:
+    image: postgres:15-alpine
+    container_name: whatsapp-test-db
+    environment:
+      - POSTGRES_DB=whatsapp_test
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5433:5432"
+    volumes:
+      - test_db_data:/var/lib/postgresql/data
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test_db_data:
