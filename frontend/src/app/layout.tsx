@@ -4,7 +4,6 @@ import { ThemeContextProvider } from "../contexts/ThemeContext";
 import { AuthProvider } from "../contexts/auth-context";
 import { SocketProvider } from "../contexts/SocketContext";
 import { RealtimeNotifications } from "../components/notifications/RealtimeNotifications";
-import { SocketDebugger } from "../components/SocketDebugger";
 import "./globals.css";
 
 // Note: Install React DevTools browser extension for better development experience
@@ -54,7 +53,6 @@ export default function RootLayout({
                 maxNotifications={5}
                 autoHideDuration={5000}
               />
-              {process.env.NODE_ENV === 'development' && <SocketDebugger />}
             </SocketProvider>
           </AuthProvider>
         </ThemeContextProvider>

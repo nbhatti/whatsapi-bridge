@@ -59,6 +59,19 @@ const router = Router({ mergeParams: true });
  *                   type: array
  *                   items:
  *                     type: object
+ *       400:
+ *         description: Device not ready
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Device is not ready. Current status: initializing"
  *       404:
  *         description: Device not found
  *       500:
@@ -133,7 +146,18 @@ router.get('/', validate(schemas.listChats, 'query'), ChatController.listChats);
  *       200:
  *         description: Message sent successfully
  *       400:
- *         description: Invalid request data
+ *         description: Invalid request data or device not ready
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Device is not ready. Current status: initializing"
  *       404:
  *         description: Device not found
  *       500:
@@ -390,6 +414,19 @@ router.post('/:chatId/unarchive', validate(schemas.chatId, 'params'), ChatContro
  *                             url:
  *                               type: string
  *                               description: Ready-to-use URL for fetching older messages
+ *       400:
+ *         description: Device not ready
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Device is not ready. Current status: initializing"
  *       404:
  *         description: Device or chat not found
  *       500:
@@ -623,6 +660,146 @@ router.post('/:chatId/messages/delete',
  *         description: Internal server error
  */
 router.post('/location', ChatController.sendLocation);
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/chats/{chatId}/markRead:
+ *   post:
+ *     summary: Mark all messages in a chat as read
+ *     tags: [Chats, Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Chat ID
+ *     responses:
+ *       200:
+ *         description: Chat marked as read successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Chat marked as read successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     chatId:
+ *                       type: string
+ *                       example: "923009401404@c.us"
+ *                     unreadCount:
+ *                       type: integer
+ *                       example: 0
+ *                     markedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2024-01-10T15:30:00.000Z"
+ *       400:
+ *         description: Device not ready
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Device is not ready. Current status: initializing"
+ *       404:
+ *         description: Device or chat not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:chatId/markRead', 
+  validate(schemas.chatId, 'params'), 
+  ChatController.markChatAsRead
+);
+
+/**
+ * @swagger
+ * /api/v1/devices/{id}/chats/{chatId}/messages/{messageId}/markRead:
+ *   post:
+ *     summary: Mark a specific message as read (marks entire chat as read)
+ *     description: |
+ *       Note: WhatsApp Web.js doesn't support marking individual messages as read.
+ *       This endpoint verifies the message exists and then marks ALL messages in the chat as read.
+ *       This is a limitation of the WhatsApp Web.js library.
+ *     tags: [Chats, Messages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Device ID
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Chat ID
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Message ID (used for verification only)
+ *     responses:
+ *       200:
+ *         description: Message marked as read successfully (all messages in chat marked as read)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Message marked as read successfully (all messages in chat marked as read)"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     chatId:
+ *                       type: string
+ *                       example: "923009401404@c.us"
+ *                     messageId:
+ *                       type: string
+ *                       example: "false_923009401404@c.us_MESSAGE_ID_HERE"
+ *                     markedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2024-01-10T15:30:00.000Z"
+ *                     note:
+ *                       type: string
+ *                       example: "WhatsApp Web.js marks all messages in chat as read, not individual messages"
+ *       400:
+ *         description: Device not ready
+ *       404:
+ *         description: Device, chat or message not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:chatId/messages/:messageId/markRead',
+  validate(schemas.chatId, 'params'),
+  ChatController.markMessageAsRead
+);
 
 /**
  * @swagger

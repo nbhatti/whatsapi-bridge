@@ -141,11 +141,24 @@ router.use('/:id/analytics', analyticsRoutes);
  *                         type: string
  *                         example: "https://example.com/pic.jpg"
  *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Device not ready or session inactive
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   enum:
+ *                     - "Device is not ready. Please wait for device to be connected."
+ *                     - "Device session is not active. The browser page may have been closed. Please restart the device."
  *       404:
- *         $ref: '#/components/responses/NotFound'
+ *         description: Device not found
  *       500:
- *         $ref: '#/components/responses/InternalError'
+ *         description: Internal server error
  */
 router.post('/:id/contacts', validate(schemas.deviceId, 'params'), validate(schemas.getContacts, 'body'), DeviceController.getContacts);
 

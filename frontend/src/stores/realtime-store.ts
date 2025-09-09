@@ -5,20 +5,40 @@ import { useMemo } from 'react'
 
 // Types for real-time data
 export interface Message {
-  id: string
-  from: string
-  to: string
-  body: string
-  timestamp: string
-  type: 'text' | 'image' | 'document' | 'audio' | 'video'
-  deviceId: string
-  status: 'composing' | 'queued' | 'processing' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
+  id: string;
+  rawId?: string | object; // To store the original ID for replies
+  text: string;
+  timestamp: string;
+  from: string;
+  to: string;
+  sender: 'me' | 'other';
+  status: 'composing' | 'queued' | 'processing' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  type: 'text' | 'image' | 'file' | 'location' | 'audio';
+  deviceId: string;
+  queueInfo?: {
+    position?: number;
+    estimatedTime?: number;
+    priority?: 'high' | 'normal' | 'low';
+  };
+  replyTo?: {
+    id: string;
+    text: string;
+    sender: string;
+  };
+  mentions?: string[];
+  attachmentUrl?: string;
+  attachmentName?: string;
+  duration?: number; // For audio messages
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
   metadata?: {
-    fileName?: string
-    mimeType?: string
-    size?: number
-    duration?: number
-  }
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
+  };
 }
 
 export interface Device {
@@ -85,6 +105,7 @@ interface RealtimeState {
 
   // Actions
   addMessage: (message: Message) => void
+  addOrUpdateMessages: (messages: Message[]) => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void
   removeMessage: (messageId: string) => void
   clearMessages: () => void
@@ -141,6 +162,51 @@ export const useRealtimeStore = create<RealtimeState>()(
             lastUpdate: new Date().toISOString()
           }
         })
+      },
+
+      addOrUpdateMessages: (newMessages: Message[]) => {
+        set((state: RealtimeState) => {
+          const messageMap = new Map(state.messages.map(msg => [msg.id, msg]));
+          let addedCount = 0;
+          let updatedCount = 0;
+      
+          newMessages.forEach(msg => {
+            const existing = messageMap.get(msg.id);
+            if (existing) {
+              // Update existing message, preserving important fields from optimistic updates
+              const updated = {
+                ...existing,
+                ...msg,
+                // Don't overwrite 'sending' status with older status if the new one isn't better
+                status: msg.status === 'sent' && existing.status === 'sending' ? 'sent' : 
+                       msg.status === 'delivered' && ['sending', 'sent'].includes(existing.status) ? 'delivered' :
+                       msg.status === 'read' && ['sending', 'sent', 'delivered'].includes(existing.status) ? 'read' :
+                       msg.status || existing.status
+              };
+              messageMap.set(msg.id, updated);
+              updatedCount++;
+              console.log('🔄 Updated message:', msg.id, 'status:', existing.status, '->', updated.status);
+            } else {
+              messageMap.set(msg.id, msg);
+              addedCount++;
+              console.log('➕ Added new message:', msg.id, 'status:', msg.status);
+            }
+          });
+      
+          const updatedMessages = Array.from(messageMap.values())
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            .slice(-1000); // Keep last 1000 messages
+          
+          if (addedCount > 0 || updatedCount > 0) {
+            console.log(`📦 Message store update: +${addedCount} new, ~${updatedCount} updated, total: ${updatedMessages.length}`);
+          }
+      
+          return {
+            messages: updatedMessages,
+            messageCount: updatedMessages.length,
+            lastUpdate: new Date().toISOString()
+          };
+        });
       },
 
       updateMessage: (messageId: string, updates: Partial<Message>) => {

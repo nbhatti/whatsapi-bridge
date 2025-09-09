@@ -159,6 +159,7 @@ export class DeviceManager {
         return Array.from(this.devices.values());
     }
 
+
     public async deleteDevice(id: string): Promise<void> {
         const device = this.devices.get(id);
         if (device) {
@@ -410,6 +411,13 @@ export class DeviceManager {
             this.updateDeviceInRedis(device);
             emitMessage(id, message);
             
+            // Invalidate chat cache when message received
+            try {
+                await this.invalidateChatCacheForMessage(id, message);
+            } catch (error) {
+                logger.error(`Failed to invalidate chat cache for message from device ${this.getDeviceDisplayId(device)}:`, error);
+            }
+            
             // Cache inbound message
             if (shouldCacheMessage(message)) {
                 try {
@@ -477,6 +485,25 @@ export class DeviceManager {
             this.updateDeviceInRedis(device);
             emitDeviceState(id, state);
         });
+    }
+
+    /**
+     * Invalidate chat cache when a message is received or sent
+     * This ensures unread counts and last messages are always fresh
+     */
+    private async invalidateChatCacheForMessage(deviceId: string, message: any): Promise<void> {
+        try {
+            // Import invalidateDeviceCache dynamically to avoid circular imports
+            const { invalidateDeviceCache } = await import('./chatCache');
+            
+            // Invalidate the entire device cache when any message is received
+            // This ensures unread counts, last messages, and timestamps are fresh
+            await invalidateDeviceCache(deviceId);
+            
+            logger.debug(`Invalidated chat cache for device ${deviceId} due to message from ${redactPhoneNumber(message.from || message.to)}`);
+        } catch (error) {
+            logger.error(`Failed to invalidate chat cache for device ${deviceId}:`, error);
+        }
     }
 
     /**

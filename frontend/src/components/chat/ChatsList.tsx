@@ -19,7 +19,8 @@ import {
   Alert,
   Chip,
   Menu,
-  MenuItem
+  MenuItem,
+  Button
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -31,7 +32,8 @@ import {
   Archive as ArchiveIcon,
   PushPin as PinIcon,
   VolumeOff as MuteIcon,
-  MarkChatUnread as MarkUnreadIcon
+  MarkChatUnread as MarkUnreadIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { backendAPI, BackendChat } from '../../lib/backend-api';
 import { useMessages } from '../../stores/realtime-store';
@@ -60,6 +62,7 @@ export function ChatsList({ selectedDevices, selectedChat, onChatSelect, disable
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDeviceInactive, setIsDeviceInactive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -80,6 +83,7 @@ export function ChatsList({ selectedDevices, selectedChat, onChatSelect, disable
     
     try {
       const allChats: Chat[] = [];
+      let inactiveDeviceFound = false;
       
       for (const deviceId of selectedDevices) {
         try {
@@ -112,11 +116,24 @@ export function ChatsList({ selectedDevices, selectedChat, onChatSelect, disable
           allChats.push(...formattedChats);
         } catch (deviceError) {
           console.warn(`Failed to load chats for device ${deviceId}:`, deviceError);
+          const errorMsg = deviceError instanceof Error ? deviceError.message : String(deviceError);
+          if (errorMsg.includes('Device session is not active') || errorMsg.includes('restart the device')) {
+            inactiveDeviceFound = true;
+          }
         }
       }
       
       allChats.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       setChats(allChats);
+      setIsDeviceInactive(inactiveDeviceFound);
+      
+      if (inactiveDeviceFound && allChats.length === 0) {
+        setError('Device session is not active. Please reconnect the device to load chats.');
+      } else if (allChats.length === 0 && selectedDevices.length > 0) {
+        setError('No chats found or device is not ready.');
+      } else {
+        setError(null);
+      }
     } catch (err) {
       console.error('Failed to load chats:', err);
       setError(err instanceof Error ? err.message : 'Failed to load chats');
@@ -285,8 +302,7 @@ export function ChatsList({ selectedDevices, selectedChat, onChatSelect, disable
       {error && (
         <Box className="px-4 pb-2">
           <Alert 
-            severity={error.includes('not yet available') || error.includes('not yet implemented') ? 'info' : 'error'} 
-            size="small"
+            severity={error.includes('not yet available') || error.includes('not yet implemented') ? 'info' : 'error'}
           >
             {error}
           </Alert>
@@ -300,6 +316,30 @@ export function ChatsList({ selectedDevices, selectedChat, onChatSelect, disable
           <Typography variant="body2" className="text-gray-600">
             Select devices to view chats
           </Typography>
+        </Box>
+      )}
+
+      {/* Device Inactive */}
+      {isDeviceInactive && (
+        <Box className="p-4 text-center">
+          <Alert severity="warning" className="mb-4">
+            <Typography variant="h6" gutterBottom>
+              Device Session Inactive
+            </Typography>
+            <Typography variant="body2">
+              The WhatsApp device needs to be reconnected. Please scan the QR code in your backend dashboard.
+            </Typography>
+          </Alert>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              window.open('http://localhost:3000', '_blank');
+            }}
+            startIcon={<RefreshIcon />}
+          >
+            Open Backend Dashboard
+          </Button>
         </Box>
       )}
 

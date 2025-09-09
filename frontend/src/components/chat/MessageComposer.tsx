@@ -25,7 +25,7 @@ import {
 } from '@mui/icons-material';
 
 interface MessageComposerProps {
-  onSendMessage: (data: { message: string }) => void;
+  onSendMessage: (data: { text: string }) => void;
   onFileUpload: (file: File) => void;
   onLocationShare: () => void;
 }
@@ -43,6 +43,7 @@ export function MessageComposer({ onSendMessage, onFileUpload, onLocationShare }
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   
   const { control, handleSubmit, reset, watch, formState: { isSubmitting } } = useForm<MessageFormData>({
     defaultValues: {
@@ -57,8 +58,12 @@ export function MessageComposer({ onSendMessage, onFileUpload, onLocationShare }
     if (!data.message.trim()) return;
     
     try {
-      await onSendMessage(data);
+      await onSendMessage({ text: data.message });
       reset();
+      // Focus back to the input after sending
+      setTimeout(() => {
+        textInputRef.current?.focus();
+      }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -238,6 +243,7 @@ export function MessageComposer({ onSendMessage, onFileUpload, onLocationShare }
                 render={({ field }) => (
                   <TextField
                     {...field}
+                    inputRef={textInputRef}
                     multiline
                     maxRows={5}
                     placeholder="Type a message..."

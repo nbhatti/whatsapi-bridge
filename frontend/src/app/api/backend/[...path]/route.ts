@@ -24,8 +24,9 @@ export async function GET(
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
       return NextResponse.json(
-        { error: `Backend error: ${response.status}` },
+        { error: `Backend error: ${response.status}`, details: errorText },
         { status: response.status }
       );
     }

@@ -775,3 +775,212 @@ export const searchChats = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
+
+/**
+ * Mark all messages in a chat as read
+ */
+export const markChatAsRead = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceManager = DeviceManager.getInstance();
+    const device = deviceManager.getDevice(req.params.id);
+    if (!device) {
+      res.status(404).json({ success: false, error: 'Device not found' });
+      return;
+    }
+
+    if (device.status !== 'ready') {
+      res.status(400).json({ 
+        success: false, 
+        error: `Device is not ready. Current status: ${device.status}`,
+        currentStatus: device.status
+      });
+      return;
+    }
+
+    // Check if client is properly initialized
+    if (!device.client) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'WhatsApp client not initialized'
+      });
+      return;
+    }
+
+    // Validate chat ID format
+    const chatId = req.params.chatId;
+    if (!chatId || (!chatId.includes('@c.us') && !chatId.includes('@g.us'))) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid chat ID format. Expected format: number@c.us or number@g.us'
+      });
+      return;
+    }
+
+    let chat;
+    let initialUnreadCount = 0;
+    
+    try {
+      chat = await device.client.getChatById(chatId);
+      initialUnreadCount = chat.unreadCount || 0;
+    } catch (chatError: any) {
+      logger.error('Error getting chat for mark as read:', chatError);
+      
+      // Check for session-related errors
+      if (chatError.message?.includes('Session closed') || 
+          chatError.message?.includes('Evaluation failed') ||
+          chatError.message?.includes('Protocol error')) {
+        res.status(500).json({ 
+          success: false, 
+          error: 'WhatsApp session is closed or invalid. Please reconnect the device.',
+          sessionError: true,
+          details: process.env.NODE_ENV === 'development' ? chatError.message : undefined
+        });
+        return;
+      }
+      
+      // Chat not found
+      res.status(404).json({ 
+        success: false, 
+        error: 'Chat not found or inaccessible'
+      });
+      return;
+    }
+    
+    // Mark all messages in the chat as read using sendSeen()
+    try {
+      await chat.sendSeen();
+      logger.info(`Marked chat ${chatId} as read (had ${initialUnreadCount} unread messages)`);
+    } catch (sendSeenError: any) {
+      logger.error('Error calling sendSeen():', sendSeenError);
+      
+      // Check for session-related errors
+      if (sendSeenError.message?.includes('Session closed') || 
+          sendSeenError.message?.includes('Evaluation failed') ||
+          sendSeenError.message?.includes('Protocol error')) {
+        res.status(500).json({ 
+          success: false, 
+          error: 'WhatsApp session is closed or invalid. Please reconnect the device.',
+          sessionError: true,
+          details: process.env.NODE_ENV === 'development' ? sendSeenError.message : undefined
+        });
+        return;
+      }
+      
+      throw sendSeenError; // Re-throw non-session errors
+    }
+    
+    // Wait a moment for WhatsApp to process the read status
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Invalidate chat cache for this device to force fresh data
+    try {
+      const { invalidateDeviceCache } = await import('../services/chatCache');
+      await invalidateDeviceCache(req.params.id);
+    } catch (cacheError) {
+      logger.warn('Failed to invalidate device cache:', cacheError);
+      // Continue execution - cache invalidation failure is not critical
+    }
+    
+    // Get fresh chat info to return current unread count
+    let finalUnreadCount = 0;
+    try {
+      const updatedChat = await device.client.getChatById(chatId);
+      finalUnreadCount = updatedChat.unreadCount || 0;
+    } catch (chatError) {
+      // If we can't get updated chat info, assume it worked
+      logger.warn('Could not get updated chat info after marking as read:', chatError);
+      finalUnreadCount = 0;
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Chat marked as read successfully',
+      data: {
+        chatId,
+        initialUnreadCount,
+        unreadCount: finalUnreadCount,
+        markedAt: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error marking chat as read:', error);
+    
+    // Check for session-related errors at top level
+    if (error.message?.includes('Session closed') || 
+        error.message?.includes('Evaluation failed') ||
+        error.message?.includes('Protocol error')) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'WhatsApp session is closed or invalid. Please reconnect the device.',
+        sessionError: true,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to mark chat as read',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Mark a specific message as read
+ * Note: WhatsApp Web.js doesn't support marking individual messages as read,
+ * so this will mark all messages in the chat as read up to the specified message
+ */
+export const markMessageAsRead = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deviceManager = DeviceManager.getInstance();
+    const device = deviceManager.getDevice(req.params.id);
+    if (!device) {
+      res.status(404).json({ success: false, error: 'Device not found' });
+      return;
+    }
+
+    if (device.status !== 'ready') {
+      res.status(400).json({ 
+        success: false, 
+        error: `Device is not ready. Current status: ${device.status}`,
+        currentStatus: device.status
+      });
+      return;
+    }
+
+    const { messageId } = req.params;
+    
+    // Get the message to verify it exists
+    const chat = await device.client.getChatById(req.params.chatId);
+    const messages = await chat.fetchMessages({ limit: 100 });
+    const messageToMarkRead = messages.find(msg => msg.id._serialized === messageId);
+    
+    if (!messageToMarkRead) {
+      res.status(404).json({ success: false, error: 'Message not found' });
+      return;
+    }
+
+    // WhatsApp Web.js doesn't support marking individual messages as read,
+    // so we mark the entire chat as read (which includes the specified message)
+    await chat.sendSeen();
+    
+    res.json({ 
+      success: true, 
+      message: 'Message marked as read successfully (all messages in chat marked as read)',
+      data: {
+        chatId: req.params.chatId,
+        messageId: messageId,
+        markedAt: new Date().toISOString(),
+        note: 'WhatsApp Web.js marks all messages in chat as read, not individual messages'
+      }
+    });
+  } catch (error) {
+    logger.error('Error marking message as read:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to mark message as read',
+      details: process.env.NODE_ENV === 'development' ? (error as any).message : undefined
+    });
+  }
+};

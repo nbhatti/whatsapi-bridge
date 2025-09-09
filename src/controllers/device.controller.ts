@@ -89,6 +89,7 @@ export class DeviceController {
         phoneNumber: device.phoneNumber || null,
         clientName: device.clientName || null,
       };
+      
 
       // If device is waiting for QR scan, include QR data URL
       if (device.status === 'qr' && device.qrCode) {
@@ -305,6 +306,7 @@ export class DeviceController {
         });
         return;
       }
+      
 
       let contacts;
       

@@ -217,8 +217,8 @@ export const DeviceList: React.FC<DeviceListProps> = ({ devices, onDeviceUpdate 
       }
     } catch (error) {
       console.error(`Failed to ${action} device:`, error)
-      // You might want to show a toast notification here
-      alert(`Failed to ${action} device: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Avoid blocking alerts; log instead (hook up toast/snackbar if desired)
+      console.warn(`Failed to ${action} device: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setActionLoading(prev => ({ ...prev, [device.id]: null }))
     }
@@ -249,14 +249,14 @@ export const DeviceList: React.FC<DeviceListProps> = ({ devices, onDeviceUpdate 
                 setQrDevice(device)
                 setShowQRPopup(true)
               } else {
-                alert('QR code not available. Device may already be connected.')
+                console.warn('QR code not available. Device may already be connected.')
               }
             } else {
-              alert('Failed to get QR code. Please try again.')
+              console.warn('Failed to get QR code. Please try again.')
             }
           } catch (error) {
             console.error('Failed to get QR code:', error)
-            alert('Failed to get QR code. Please try again.')
+            console.warn('Failed to get QR code. Please try again.')
           }
           break
           
@@ -277,7 +277,7 @@ export const DeviceList: React.FC<DeviceListProps> = ({ devices, onDeviceUpdate 
       }
     } catch (error) {
       console.error(`Failed to handle status action ${action}:`, error)
-      alert(`Failed to ${action}. Please try again.`)
+      console.warn(`Failed to ${action}. Please try again.`)
     } finally {
       setActionLoading(prev => ({ ...prev, [device.id]: null }))
     }

@@ -272,6 +272,8 @@ class BackendAPIService {
     limit?: number
     offset?: number
     search?: string
+    filter?: string // e.g. 'unread'
+    force_refresh?: boolean
   }): Promise<BackendChat[]> {
     // Try GET first (most common pattern)
     let url = `/devices/${deviceId}/chats`
@@ -279,28 +281,94 @@ class BackendAPIService {
     
     if (filters?.limit) params.set('limit', filters.limit.toString())
     if (filters?.offset) params.set('offset', filters.offset.toString())
-    if (filters?.search) params.set('search', filters.search)
+    // Many backends expect 'q' for search queries. Use 'q' instead of 'search'.
+    if (filters?.search) params.set('q', filters.search)
+    if (filters?.filter) params.set('filter', filters.filter)
+    if (typeof filters?.force_refresh === 'boolean') params.set('force_refresh', String(filters.force_refresh))
     
     if (params.toString()) {
       url += `?${params.toString()}`
     }
 
     try {
+      console.log(`Loading chats from: GET ${this.baseUrl}${url}`)
       const response = await this.makeRequest(url, {
         method: 'GET',
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        
-        // Provide more helpful error messages
-        if (response.status === 404) {
-          throw new Error(`Chat endpoint not found. The backend may not have implemented GET /devices/${deviceId}/chats yet.`)
-        } else if (response.status === 400) {
-          throw new Error(errorData.error || 'Invalid request format. Check if the backend expects different parameters.')
-        } else {
-          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+        // Try to parse JSON first, then fall back to text to capture proxy 'details'
+        let errorText = ''
+        let errorJson: any = null
+        try { errorJson = await response.json() } catch {
+          try { errorText = await response.text() } catch { /* ignore */ }
         }
+
+        const details = errorJson?.details || errorText || errorJson?.error
+        const baseMsg = `HTTP ${response.status}: ${response.statusText}`
+
+        if (response.status === 404 || response.status === 400) {
+          // Fallback strategies for common backends
+          const firstTry = new URLSearchParams()
+          if (filters?.limit) firstTry.set('take', String(filters.limit))
+          if (filters?.offset) firstTry.set('skip', String(filters.offset))
+          if (filters?.search) firstTry.set('q', filters.search)
+
+          let altUrl = `/devices/${deviceId}/chats${firstTry.toString() ? `?${firstTry.toString()}` : ''}`
+          console.warn(`Retrying chats with alternative params: GET ${this.baseUrl}${altUrl}`)
+          let altResp = await this.makeRequest(altUrl, { method: 'GET' })
+          if (altResp.ok) {
+            const altData = await altResp.json()
+            return altData.data || altData || []
+          }
+
+          // Second fallback: page/pageSize/query
+          const secondTry = new URLSearchParams()
+          if (filters?.limit) secondTry.set('pageSize', String(filters.limit))
+          secondTry.set('page', String(Math.floor((filters?.offset ?? 0) / (filters?.limit ?? 50)) + 1))
+          if (filters?.search) secondTry.set('query', filters.search)
+
+          altUrl = `/devices/${deviceId}/chats${secondTry.toString() ? `?${secondTry.toString()}` : ''}`
+          console.warn(`Retrying chats with page params: GET ${this.baseUrl}${altUrl}`)
+          altResp = await this.makeRequest(altUrl, { method: 'GET' })
+          if (altResp.ok) {
+            const altData = await altResp.json()
+            return altData.data || altData || []
+          }
+
+          // Third fallback: POST /devices/{id}/chats/list
+          const body = {
+            limit: filters?.limit ?? 50,
+            offset: filters?.offset ?? 0,
+            search: filters?.search ?? undefined
+          }
+          console.warn(`Retrying chats via POST list: POST ${this.baseUrl}/devices/${deviceId}/chats/list`)
+          altResp = await this.makeRequest(`/devices/${deviceId}/chats/list`, {
+            method: 'POST',
+            body: JSON.stringify(body)
+          })
+          if (altResp.ok) {
+            const altData = await altResp.json()
+            return altData.data || altData || []
+          }
+
+          // Fourth fallback: POST /devices/{id}/chats
+          console.warn(`Retrying chats via POST base: POST ${this.baseUrl}/devices/${deviceId}/chats`)
+          altResp = await this.makeRequest(`/devices/${deviceId}/chats`, {
+            method: 'POST',
+            body: JSON.stringify(body)
+          })
+          if (altResp.ok) {
+            const altData = await altResp.json()
+            return altData.data || altData || []
+          }
+
+          // If still failing, throw enriched error
+          throw new Error((details || errorJson?.error || baseMsg) + ' - Tried fallbacks: take/skip, page/pageSize, POST list, POST base')
+        }
+        
+        // Other error codes
+        throw new Error((errorJson?.error ? `${errorJson.error}. ` : '') + baseMsg + (details ? ` - ${details}` : ''))
       }
 
       const data = await response.json()
@@ -861,6 +929,26 @@ class BackendAPIService {
 
     const data = await response.json()
     return data.data || data
+  }
+
+  /**
+   * Mark an entire chat as read
+   * POST /devices/{deviceId}/chats/{chatId}/markRead
+   */
+  async markChatAsRead(deviceId: string, chatId: string, options?: { sendSeen?: boolean }): Promise<{ success: boolean }> {
+    const url = `/devices/${deviceId}/chats/${encodeURIComponent(chatId)}/markRead`
+    const response = await this.makeRequest(url, {
+      method: 'POST',
+      body: options ? JSON.stringify(options) : undefined,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const data = await response.json().catch(() => ({ success: true }))
+    return data
   }
 
   /**

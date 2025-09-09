@@ -60,13 +60,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
   // Memoize callback functions to prevent infinite loops
   const handleConnect = useCallback(() => {
-    console.log('Socket connected successfully')
     setCurrentStatus('connected')
     setConnectionError(null)
   }, [])
 
   const handleDisconnect = useCallback(() => {
-    console.log('Socket disconnected')
     setCurrentStatus('disconnected')
   }, [])
 

@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # Main application
+  whatsapp-api:
+    image: whatsapi-bridge:latest
+    container_name: whatsapp-api-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - API_KEY=${API_KEY}
+      
+      # Redis Configuration with Feature Flag
+      - REDIS_ENABLED=${REDIS_ENABLED:-true}
+      - REDIS_URL=redis://redis-prod:6379
+      - REDIS_HOST=redis-prod
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_MAX_RETRIES=5
+      - REDIS_CONNECT_TIMEOUT=10000
+      - REDIS_COMMAND_TIMEOUT=5000
+      
+      # Cache Configuration
+      - MAX_LIST_LENGTH=50000
+      - SYNC_INTERVAL_MS=3000
+      
+      # Production Settings
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
+      - ENABLE_METRICS=true
+      - ENABLE_HEALTH_CHECKS=true
+      
+      # Performance Settings
+      - MAX_MEMORY_USAGE_MB=2048
+      - REDIS_MEMORY_THRESHOLD_MB=1024
+      
+    volumes:
+      - /opt/whatsapi-bridge/logs:/app/logs
+      - /opt/whatsapi-bridge/config:/app/config:ro
+    networks:
+      - prod-network
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Redis for caching
+  redis-prod:
+    image: redis:alpine
+    container_name: redis-prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind to localhost only for security
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: >
+      redis-server
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - /opt/whatsapi-bridge/data/redis:/data
+    networks:
+      - prod-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # PostgreSQL Database (if needed)
+  postgres-prod:
+    image: postgres:16
+    container_name: postgres-prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to localhost only
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-whatsapp}
+      - POSTGRES_USER=${POSTGRES_USER:-whatsapp}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - /opt/whatsapi-bridge/data/postgres:/var/lib/postgresql/data
+    networks:
+      - prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-whatsapp}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  prod-network:
+    driver: bridge
+    name: whatsapp-prod-network
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Box,
@@ -32,7 +32,9 @@ import {
   MoreVert as MoreVertIcon,
   PlayArrow as PlayArrowIcon,
   Pause as PauseIcon,
-  GraphicEq as GraphicEqIcon
+  GraphicEq as GraphicEqIcon,
+  Wifi as WifiIcon,
+  WifiOff as WifiOffIcon
 } from '@mui/icons-material';
 import { MessageComposer } from './MessageComposer';
 import { LocationPicker } from './LocationPicker';
@@ -40,8 +42,7 @@ import { AudioPlayer } from './AudioPlayer';
 import { MediaThumbnail } from './MediaThumbnail';
 import { MediaPlayerDialog } from './MediaPlayer';
 import { backendAPI, BackendMessage } from '../../lib/backend-api';
-import { useMessages, useRealtimeStore } from '../../stores/realtime-store'; // Import the useMessages hook
-import { DisplayMessage, MessageStatus } from '../../types/media';
+import { useMessages, useRealtimeStore, Message } from '../../stores/realtime-store';
 import {
   MessageAction,
   ReplyAction,
@@ -53,35 +54,6 @@ import {
   MessageSelection,
   NewMessageData
 } from '../../types/message-actions';
-
-interface Message {
-  id: string;
-  rawId?: string | object; // To store the original ID for replies
-  text: string;
-  timestamp: string;
-  sender: 'me' | 'other';
-  status: 'composing' | 'queued' | 'processing' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
-  type: 'text' | 'image' | 'file' | 'location' | 'audio';
-  queueInfo?: {
-    position?: number;
-    estimatedTime?: number;
-    priority?: 'high' | 'normal' | 'low';
-  };
-  replyTo?: {
-    id: string;
-    text: string;
-    sender: string;
-  };
-  mentions?: string[];
-  attachmentUrl?: string;
-  attachmentName?: string;
-  duration?: number; // For audio messages
-  location?: {
-    latitude: number;
-    longitude: number;
-    address?: string;
-  };
-}
 
 interface SelectedChat {
   chatId: string;
@@ -100,8 +72,8 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
   const chatId = selectedChat?.chatId;
   const deviceId = selectedChat?.deviceId;
   const chatName = selectedChat?.chatName;
-  const allMessages = useMessages(); // Get all messages from the store
-  const [messages, setMessages] = useState<Message[]>([]);
+  const allMessages = useMessages();
+  const { addMessage, updateMessage, addOrUpdateMessages, removeMessage } = useRealtimeStore();
   
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -111,20 +83,22 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [mediaPlayerOpen, setMediaPlayerOpen] = useState(false);
   const [selectedMediaMessage, setSelectedMediaMessage] = useState<BackendMessage | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const { addMessage, updateMessage } = useRealtimeStore(); // Get store actions
 
-  // Filter messages for the selected chat
-  useEffect(() => {
-    if (chatId) {
-      const chatMessages = allMessages.filter(msg => msg.to === chatId || msg.from === chatId);
-      const converted = chatMessages.map(convertBackendMessage);
-      setMessages(converted);
-    }
+  const messages = useMemo(() => {
+    if (!chatId) return [];
+    const chatMessages = allMessages
+      .filter(msg => msg.to === chatId || msg.from === chatId);
+    
+    // Sort by timestamp to ensure correct order
+    chatMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    
+    return chatMessages;
   }, [allMessages, chatId]);
 
   // Chat data based on selected chat
@@ -161,16 +135,25 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
         messageId = String(idObj._serialized);
       } else if (idObj.id) {
         messageId = String(idObj.id);
-      } else if (idObj.server && idObj.user) {
-        // Create ID from server and user components
-        messageId = `${idObj.fromMe ? 'true' : 'false'}_${idObj.user}@${idObj.server}_${idObj._serialized || Date.now()}`;
       } else {
-        // Fallback: stringify the object
-        messageId = JSON.stringify(idObj).replace(/[^a-zA-Z0-9]/g, '_');
+        // Create deterministic ID from object properties to avoid duplicates
+        const keyParts = [
+          idObj.fromMe ? 'true' : 'false',
+          idObj.user || 'unknown',
+          idObj.server || 'c.us',
+          String(backendMsg.timestamp || Date.now())
+        ];
+        messageId = keyParts.join('_');
       }
     } else {
-      // Create a unique fallback ID using timestamp, chat ID, and index
-      messageId = `msg-${chatId}-${backendMsg.timestamp}-${index || 0}-${Math.random().toString(36).substr(2, 9)}`;
+      // Create a deterministic fallback ID to avoid random duplicates
+      const keyParts = [
+        chatId || 'unknown',
+        String(backendMsg.timestamp || Date.now()),
+        String(index || 0),
+        backendMsg.fromMe ? 'me' : 'other'
+      ];
+      messageId = `msg_${keyParts.join('_')}`;
     }
 
     // Extract quoted message ID if available
@@ -183,11 +166,12 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
       }
     }
 
-    // Handle different message types
-    let messageText = safeString(backendMsg.body);
+    // Handle different message types - be more defensive about getting text
+    let messageText = safeString(backendMsg.body || backendMsg.text || backendMsg.caption);
     let messageType: 'text' | 'image' | 'file' | 'location' | 'audio' = 'text';
     let attachmentUrl: string | undefined;
     let duration: number | undefined;
+    
     
     // Process mentions from various sources in the backend message
     let mentions: string[] = [];
@@ -218,7 +202,7 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
     
     // Handle call log messages
     if (backendMsg.type === 'call_log') {
-      const callData = backendMsg._data || backendMsg;
+      const callData: any = backendMsg._data || backendMsg;
       const callOutcome = callData.callOutcome;
       const isVideoCall = callData.isVideoCall;
       const callDuration = callData.callDuration;
@@ -301,23 +285,84 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
       messageText = `📄 ${backendMsg.type || 'Message'}`;
     }
 
+    // Extract from and to fields from the backend message structure
+    const from = (backendMsg._data?.from || (typeof backendMsg.id === 'object' && (backendMsg.id as any).remote) || (backendMsg.fromMe ? 'me' : '')) as string;
+    const to = (backendMsg._data?.to || chatId) as string | undefined;
+
+    // Determine message status based on backend data
+    let messageStatus: Message['status'] = 'read'; // Default fallback
+    
+    if (backendMsg.fromMe) {
+      // For outgoing messages, check delivery/read status
+      if (backendMsg.ack !== undefined) {
+        switch (backendMsg.ack) {
+          case 0: messageStatus = 'sending'; break;
+          case 1: messageStatus = 'sent'; break;
+          case 2: messageStatus = 'delivered'; break;
+          case 3: messageStatus = 'read'; break;
+          default: messageStatus = 'sent'; break;
+        }
+      } else {
+        // Fallback for outgoing messages without ack info
+        messageStatus = 'sent';
+      }
+    } else {
+      // For incoming messages, they're typically already "delivered" to us
+      messageStatus = 'read';
+    }
+    
+    // Safe timestamp parsing with validation
+    const safeTimestamp = (timestamp: any): string => {
+      if (!timestamp) {
+        return new Date().toISOString();
+      }
+      
+      try {
+        // Handle different timestamp formats
+        let dateValue: Date;
+        
+        if (typeof timestamp === 'string') {
+          dateValue = new Date(timestamp);
+        } else if (typeof timestamp === 'number') {
+          // Handle both milliseconds and seconds
+          dateValue = timestamp > 1e10 ? new Date(timestamp) : new Date(timestamp * 1000);
+        } else {
+          dateValue = new Date(timestamp);
+        }
+        
+        // Validate the date
+        if (isNaN(dateValue.getTime())) {
+          console.warn('Invalid timestamp received:', timestamp, 'using current time');
+          return new Date().toISOString();
+        }
+        
+        return dateValue.toISOString();
+      } catch (error) {
+        console.error('Error parsing timestamp:', timestamp, error);
+        return new Date().toISOString();
+      }
+    };
+    
     return {
       id: messageId,
       rawId: backendMsg.id, // Store the original ID
       text: messageText,
-      timestamp: new Date(backendMsg.timestamp).toISOString(), // Backend already provides milliseconds
+      timestamp: safeTimestamp(backendMsg.timestamp),
+      from: from || '',
+      to: to || chatId || '', // Ensure string
       sender: backendMsg.fromMe ? 'me' : 'other',
-      status: 'read',
+      status: messageStatus,
       type: messageType,
       replyTo: backendMsg.quotedMsg ? {
         id: quotedMsgId || `quoted-${Date.now()}`,
-        text: safeString(backendMsg.quotedMsg.body, 'Quoted message'),
+        text: safeString((backendMsg as any).quotedMsg?.body || (backendMsg as any).quotedMsg?.text, 'Quoted message'),
         sender: backendMsg.quotedMsg.fromMe ? 'You' : safeString(backendMsg.quotedMsg.author, chatData?.name || 'Contact')
       } : undefined,
       mentions: mentions.length > 0 ? mentions : undefined,
       attachmentUrl: attachmentUrl,
       duration: duration,
-      location: backendMsg.location
+      location: backendMsg.location,
+      deviceId: deviceId || ''
     };
   };
 
@@ -329,25 +374,21 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
       setLoading(true);
       const currentPage = reset ? 1 : page;
       
-      console.log(`Loading messages for chat ${chatId}, page ${currentPage}`);
-      
       const response = await backendAPI.getMessages(deviceId, chatId, {
         limit: 50,
         // Add pagination support later if needed
       });
 
-      const newMessages = response.data.map(convertBackendMessage);
+      const newMessages = response.data.map(msg => convertBackendMessage(msg));
+      addOrUpdateMessages(newMessages);
       
       if (reset) {
-        setMessages(newMessages);
         setPage(2);
       } else {
-        setMessages(prev => [...newMessages, ...prev]);
         setPage(currentPage + 1);
       }
       
       setHasMore(response.pagination.hasMore);
-      console.log(`Loaded ${newMessages.length} messages for chat ${chatId}`);
       
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -355,13 +396,12 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
     } finally {
       setLoading(false);
     }
-  }, [chatId, deviceId, loading, page]);
+  }, [chatId, deviceId, loading, page, addOrUpdateMessages]);
 
   // Load messages when chat changes
   useEffect(() => {
     if (chatId && deviceId) {
       console.log('Chat changed to:', chatId);
-      setMessages([]); // Clear messages immediately
       setPage(1);
       setHasMore(true);
       setLoading(false); // Reset loading state
@@ -394,247 +434,149 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
     }
   }, [handleScroll]);
 
-  // Handle message sending with enhanced status tracking
-  const handleSendMessage = async (data: NewMessageData) => {
-    if (!chatId || !deviceId) return;
 
-    const tempId = `temp-${Date.now()}`;
-    const newMessage = {
-      id: tempId,
-      body: data.text,
-      timestamp: new Date().toISOString(),
-      from: 'me',
-      to: chatId,
-      status: 'composing',
-      type: 'text',
-      deviceId: deviceId,
-      replyTo: replyingTo ? {
-        id: replyingTo.id,
-        text: replyingTo.text,
-        sender: replyingTo.sender === 'me' ? 'You' : chatData?.name || 'Contact'
-      } : undefined
-    };
-
-    addMessage(newMessage as any);
-    setReplyingTo(null);
+  // Import WebSocket connection status from context
+  const { isConnected: isSocketConnected } = useRealtimeStore();
+  
+  // Fallback polling - only when WebSocket is disconnected
+  const pollingRef = useRef(false);
+  const lastPollTimeRef = useRef(0);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const poll = useCallback(async () => {
+    // Only poll if WebSocket is disconnected
+    if (isSocketConnected || !deviceId || !chatId || loading || pollingRef.current) return;
+    
+    // Throttle polling to avoid excessive requests
+    const now = Date.now();
+    if (now - lastPollTimeRef.current < 5000) return; // 5 second throttle for fallback
+    
+    pollingRef.current = true;
+    lastPollTimeRef.current = now;
 
     try {
-      updateMessage(tempId, { status: 'queued' });
+      // WebSocket disconnected, falling back to polling for new messages
+      
+      // Get the latest messages since the last one we have
+      const latestTimestamp = messages.length > 0 
+        ? Math.max(...messages.map(m => new Date(m.timestamp).getTime()))
+        : 0;
+        
+      const newMessages = await backendAPI.getChatMessages(deviceId, chatId, {
+        limit: 10, // Reduced for fallback polling
+        since: latestTimestamp
+      });
 
-      const messageData = {
-        to: chatId,
-        text: data.text,
-        quotedMessageId: replyingTo?.rawId ? (typeof replyingTo.rawId === 'string' ? replyingTo.rawId : (replyingTo.rawId as any)?._serialized) : undefined,
-        useQueue: true,
-      };
-      
-      console.log('Sending message with data:', messageData); // DEBUG
-      
-      updateMessage(tempId, { status: 'processing' });
-      const sentMessage = await backendAPI.sendUnifiedMessage(deviceId, messageData);
-      
-      // Update the message with the real ID and set status to 'sent'
-      updateMessage(tempId, { id: sentMessage.id, status: 'sent' });
-      
-    } catch (error) {
-      console.error('❌ Failed to send message:', error);
-      updateMessage(tempId, { status: 'failed' });
-    }
-  };
-
-  // Poll for message status updates
-  const pollMessageStatus = async (messageId: string, deviceId: string) => {
-    let pollCount = 0;
-    const maxPolls = 10;
-    
-    const poll = async () => {
-      if (pollCount >= maxPolls) return;
-      
-      try {
-        const status = await backendAPI.getMessageStatus(deviceId, messageId);
+      if (newMessages.length > 0) {
+        const convertedMessages = newMessages.map((msg, idx) => convertBackendMessage(msg, idx));
+        // Filter out any messages we already have to prevent duplicates
+        const existingIds = new Set(messages.map(m => m.id));
+        const trulyNewMessages = convertedMessages.filter(m => !existingIds.has(m.id));
         
-        if (status.message) {
-          // Update message status based on backend response
-          setMessages(prev => prev.map(msg => 
-            msg.id === messageId ? { 
-              ...msg, 
-              status: determineMessageStatus(status.message) 
-            } : msg
-          ));
+        if (trulyNewMessages.length > 0) {
+          addOrUpdateMessages(trulyNewMessages);
         }
-        
-        pollCount++;
-        
-        // Continue polling if message is still being processed
-        if (pollCount < maxPolls) {
-          setTimeout(poll, 2000); // Poll every 2 seconds
-        }
-      } catch (error) {
-        console.warn('Failed to poll message status:', error);
-        
-        // Fallback progression for development
-        setTimeout(() => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === messageId ? { ...msg, status: 'sent' } : msg
-          ));
-        }, 1000);
-        
-        setTimeout(() => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === messageId ? { ...msg, status: 'delivered' } : msg
-          ));
-        }, 3000);
       }
-    };
+    } catch (error) {
+      console.error('Failed to poll messages:', error);
+    } finally {
+      pollingRef.current = false;
+    }
+  }, [isSocketConnected, deviceId, chatId, loading, messages.length, addOrUpdateMessages]);
+
+  // Start/stop polling based on WebSocket connection status
+  useEffect(() => {
+    if (deviceId && chatId) {
+      if (!isSocketConnected) {
+        // WebSocket is down, start fallback polling
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+        
+        // Start polling with longer intervals since this is fallback
+        pollIntervalRef.current = setInterval(poll, 15000); // 15 seconds for fallback
+      } else {
+        // WebSocket is connected, stop polling
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          pollingRef.current = false;
+        }
+      }
+    }
     
-    // Start polling after a short delay
-    setTimeout(poll, 1000);
-  };
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      pollingRef.current = false;
+    };
+  }, [deviceId, chatId, isSocketConnected, poll]);
 
   // Determine message status from backend response
   const determineMessageStatus = (messageData: any): Message['status'] => {
-    if (messageData.acked) return 'delivered';
-    if (messageData.sent) return 'sent';
-    if (messageData.failed) return 'failed';
-    return 'sending';
-  };
-
-  // Handle file upload
-  const handleFileUpload = async (file: File) => {
-    if (!chatId) return;
-
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      text: '',
-      timestamp: new Date().toISOString(),
-      sender: 'me',
-      status: 'sending',
-      type: file.type.startsWith('image/') ? 'image' : 'file',
-      attachmentUrl: URL.createObjectURL(file),
-      attachmentName: file.name
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-
-    // Simulate upload
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
-      ));
-    }, 2000);
-  };
-
-  // Handle location sharing
-  const handleLocationShare = (location: { latitude: number; longitude: number; address?: string }) => {
-    if (!chatId) return;
-
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      text: location.address || 'Shared location',
-      timestamp: new Date().toISOString(),
-      sender: 'me',
-      status: 'sending',
-      type: 'location',
-      location
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setShowLocationPicker(false);
-
-    // Simulate sending
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
-      ));
-    }, 1000);
+    const status = messageData?.status || messageData?._data?.status;
+    switch (status) {
+      case 'queued':
+      case 'processing':
+      case 'sending':
+      case 'sent':
+      case 'delivered':
+      case 'read':
+      case 'failed':
+        return status;
+      default:
+        return messageData?.fromMe ? 'sent' : 'read';
+    }
   };
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      const d = new Date(timestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   };
 
   const getStatusIcon = (status: Message['status']) => {
     switch (status) {
-      case 'composing':
-        return <Box className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />;
       case 'queued':
-        return <Box className="flex items-center">
-          <Box className="w-2 h-2 bg-orange-400 rounded-full mr-1" />
-          <Typography variant="caption" className="text-orange-600 text-xs">Q</Typography>
-        </Box>;
       case 'processing':
-        return <Box className="flex items-center">
-          <CircularProgress size={10} className="text-blue-400" />
-          <Typography variant="caption" className="text-blue-600 text-xs ml-1">...</Typography>
-        </Box>;
       case 'sending':
-        return <CircularProgress size={12} className="text-green-400" />;
-      case 'sent':
         return <CheckIcon fontSize="small" className="text-gray-400" />;
+      case 'sent':
+        return <CheckIcon fontSize="small" className="text-gray-500" />;
       case 'delivered':
-        return <DoneAllIcon fontSize="small" className="text-gray-400" />;
+        return <DoneAllIcon fontSize="small" className="text-gray-500" />;
       case 'read':
         return <DoneAllIcon fontSize="small" className="text-blue-500" />;
       case 'failed':
-        return <Box className="flex items-center">
-          <Box className="w-3 h-3 bg-red-500 rounded-full" />
-          <Typography variant="caption" className="text-red-600 text-xs ml-1">!</Typography>
-        </Box>;
+        return <i className="material-icons text-red-500 text-sm">error</i>;
       default:
         return null;
     }
   };
 
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ top: number; left: number } | null>(null);
-
   const handleMessageContextMenu = (event: React.MouseEvent, message: Message) => {
     event.preventDefault();
-    event.stopPropagation();
     setSelectedMessage(message);
-    
-    // Set the position for the context menu
-    setContextMenuPosition({
-      top: event.clientY,
-      left: event.clientX
-    });
-    
-    // Create a virtual anchor element at the exact mouse position
-    const rect = {
-      width: 0,
-      height: 0,
-      top: event.clientY,
-      left: event.clientX,
-      bottom: event.clientY,
-      right: event.clientX,
-      x: event.clientX,
-      y: event.clientY,
-      toJSON: () => ({})
-    };
-    
-    const virtualAnchor = {
-      nodeType: 1,
-      clientWidth: 0,
-      clientHeight: 0,
-      getBoundingClientRect: () => rect,
-      offsetTop: event.clientY,
-      offsetLeft: event.clientX,
-      offsetWidth: 0,
-      offsetHeight: 0,
-      scrollTop: 0,
-      scrollLeft: 0,
-      ownerDocument: document
-    };
-    
-    setMenuAnchorEl(virtualAnchor as HTMLElement);
+    if (event.type === 'contextmenu') {
+      setContextMenuPosition({ top: (event as any).clientY, left: (event as any).clientX });
+      setMenuAnchorEl(null);
+    } else {
+      setMenuAnchorEl(event.currentTarget as HTMLElement);
+      setContextMenuPosition(null);
+    }
   };
 
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
     setSelectedMessage(null);
+    setContextMenuPosition(null);
   };
 
-  // Enhanced message action handlers
   const handleReply = () => {
     if (selectedMessage) {
       setReplyingTo(selectedMessage);
@@ -642,259 +584,249 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
     handleMenuClose();
   };
 
-  const handleForward = async () => {
-    if (!selectedMessage || !deviceId) return;
-    
-    try {
-      // For now, we'll just show a placeholder - in a real app you'd show a chat selector
-      const targetChatId = prompt('Enter chat ID to forward to:');
-      if (targetChatId) {
-        await backendAPI.forwardMessage(deviceId, {
-          messageId: selectedMessage.id,
-          to: targetChatId,
-          fromChatId: chatId
-        });
-        
-        // Show success message
-        console.log('Message forwarded successfully');
-      }
-    } catch (error) {
-      console.error('Failed to forward message:', error);
-    }
+  const handleForward = () => {
+    console.log('Forward not implemented yet');
     handleMenuClose();
   };
 
   const handleDelete = async () => {
-    if (!selectedMessage || !deviceId || !chatId) return;
-    
+    if (!deviceId || !chatId || !selectedMessage) return;
     try {
-      const forEveryone = selectedMessage.sender === 'me' && 
-        confirm('Delete for everyone? (Cancel for delete for me only)');
-      
-      await backendAPI.deleteChatMessage(deviceId, chatId, {
-        messageId: selectedMessage.id,
-        forEveryone
-      });
-      
-      // Remove message from UI
-      setMessages(prev => prev.filter(msg => msg.id !== selectedMessage.id));
-      
-    } catch (error) {
-      console.error('Failed to delete message:', error);
+      await backendAPI.deleteChatMessage(deviceId, chatId, { messageId: selectedMessage.id, forEveryone: true });
+      removeMessage(selectedMessage.id);
+    } catch (e) {
+      console.error('Delete failed, fallback to deleteMessage:', e);
+      try {
+        await backendAPI.deleteMessage(deviceId, { messageId: selectedMessage.id, forEveryone: true, fromChatId: chatId });
+        removeMessage(selectedMessage.id);
+      } catch (err) {
+        console.error('Delete message error:', err);
+      }
+    } finally {
+      handleMenuClose();
     }
-    handleMenuClose();
   };
 
   const handleCopy = () => {
-    if (!selectedMessage) return;
-    
-    let textToCopy = '';
-    
-    if (selectedMessage.text) {
-      textToCopy = selectedMessage.text;
-    } else if (selectedMessage.attachmentUrl) {
-      textToCopy = selectedMessage.attachmentUrl;
-    } else if (selectedMessage.location) {
-      textToCopy = `Location: ${selectedMessage.location.latitude}, ${selectedMessage.location.longitude}`;
-      if (selectedMessage.location.address) {
-        textToCopy += ` (${selectedMessage.location.address})`;
-      }
+    if (selectedMessage?.text) {
+      navigator.clipboard?.writeText(selectedMessage.text).catch(() => {});
     }
-    
-    if (textToCopy) {
-      navigator.clipboard.writeText(textToCopy).then(() => {
-        console.log('Message copied to clipboard');
-      }).catch(err => {
-        console.error('Failed to copy message:', err);
-      });
-    }
-    
     handleMenuClose();
   };
 
   const handleStar = async () => {
-    if (!selectedMessage || !deviceId) return;
-    
+    if (!deviceId || !selectedMessage) return;
     try {
       await backendAPI.starMessage(deviceId, selectedMessage.id, true);
-      
-      // Update message in UI (if we were tracking starred status)
-      setMessages(prev => prev.map(msg => 
-        msg.id === selectedMessage.id 
-          ? { ...msg, isStarred: true }
-          : msg
-      ));
-      
-    } catch (error) {
-      console.error('Failed to star message:', error);
+    } catch (e) {
+      console.warn('Star not supported:', e);
     }
     handleMenuClose();
   };
 
   const handleReact = async (emoji: string) => {
-    if (!selectedMessage || !deviceId) return;
-    
+    if (!deviceId || !selectedMessage) return;
     try {
       await backendAPI.reactToMessage(deviceId, selectedMessage.id, emoji);
-      console.log(`Reacted to message with ${emoji}`);
-    } catch (error) {
-      console.error('Failed to react to message:', error);
+    } catch (e) {
+      console.warn('React not supported:', e);
     }
     handleMenuClose();
   };
 
   const handleMessageInfo = () => {
-    if (!selectedMessage) return;
-    
-    // Show message info dialog (you'd implement this)
-    alert(`Message Info:\nID: ${selectedMessage.id}\nTimestamp: ${selectedMessage.timestamp}\nType: ${selectedMessage.type}\nSender: ${selectedMessage.sender}`);
+    if (selectedMessage) {
+      console.log('Message info:', selectedMessage);
+    }
     handleMenuClose();
   };
 
-  // Mark messages as read when they come into view
   const markAsRead = useCallback(async (messageIds: string[]) => {
     if (!deviceId || !chatId || messageIds.length === 0) return;
-    
     try {
       await backendAPI.markMessagesAsRead(deviceId, chatId, messageIds);
-      
-      // Update message status in UI
-      setMessages(prev => prev.map(msg => 
-        messageIds.includes(msg.id) && msg.sender === 'other'
-          ? { ...msg, status: 'read' }
-          : msg
-      ));
-    } catch (error) {
-      console.error('Failed to mark messages as read:', error);
+      messageIds.forEach(id => updateMessage(id, { status: 'read' }));
+    } catch (e) {
+      // Ignore if not supported
     }
-  }, [deviceId, chatId]);
+  }, [deviceId, chatId, updateMessage]);
 
-  // Auto-mark messages as read when they're displayed
+  const unreadMessages = useMemo(() => {
+    return messages.filter(m => m.sender === 'other' && m.status !== 'read');
+  }, [messages]);
+
+  // Mark visible incoming messages as read
   useEffect(() => {
-    const unreadMessageIds = messages
-      .filter(msg => msg.sender === 'other' && msg.status !== 'read')
-      .map(msg => msg.id);
-    
-    if (unreadMessageIds.length > 0) {
-      const timer = setTimeout(() => {
-        markAsRead(unreadMessageIds);
-      }, 1000); // Mark as read after 1 second of being visible
-      
-      return () => clearTimeout(timer);
-    }
-  }, [messages, markAsRead]);
+    if (!deviceId || !chatId) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+    const unreadIds = messages
+      .filter(m => m.sender === 'other' && m.status !== 'read')
+      .map(m => m.id);
+
+    if (unreadIds.length === 0) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        await backendAPI.markChatAsRead(deviceId, chatId, { sendSeen: true });
+        if (cancelled) return;
+        // Optimistically update local statuses
+        unreadIds.forEach(id => updateMessage(id, { status: 'read' }));
+      } catch (err) {
+        console.warn('markChatAsRead failed:', err);
+      }
+    }, 300); // debounce a bit to avoid spamming backend
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [deviceId, chatId, messages]);
 
   const renderMessage = (message: Message) => {
     const isMe = message.sender === 'me';
-    
-    // Defensive check to ensure all rendered values are strings
-    const safeRender = (value: any, fallback = ''): string => {
-      if (typeof value === 'string') return value;
-      if (value === null || typeof value === 'undefined') return fallback;
-      if (typeof value === 'object') {
-        // You can add more specific object checks if needed
-        return JSON.stringify(value);
-      }
-      return String(value);
-    };
-    
+    const hasContent = Boolean(
+      (message.text && message.text.trim().length > 0) ||
+      message.attachmentUrl ||
+      message.location ||
+      message.type === 'audio'
+    );
+    if (!hasContent) return null;
     return (
-      <Box
-        key={`${chatId}-${message.id}`}
-        className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`}
-        onContextMenu={(e) => handleMessageContextMenu(e, message)}
-      >
-        <Paper
-          className={`max-w-xs lg:max-w-md px-3 py-2 ${
-            isMe 
-              ? 'bg-green-100 dark:bg-green-900 text-black dark:text-white' 
-              : 'bg-white dark:bg-gray-700 text-black dark:text-white'
-          }`}
-          elevation={1}
-        >
+      <Box key={message.id} className={`flex mb-2 ${isMe ? 'justify-end' : 'justify-start'}`} onContextMenu={(e) => handleMessageContextMenu(e, message)}>
+        <Paper className={`max-w-[75%] px-3 py-2 ${isMe ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-700'}`} elevation={1}>
           {message.replyTo && (
-            <Box className="border-l-4 border-blue-500 pl-2 mb-2 bg-gray-50 dark:bg-gray-600 p-2 rounded">
-              <Typography variant="caption" className="font-semibold text-blue-500">
-                {safeRender(message.replyTo.sender)}
-              </Typography>
-              <Typography variant="body2" className="text-gray-600 dark:text-gray-300 truncate">
-                {safeRender(message.replyTo.text)}
-              </Typography>
-            </Box>
+            <Box className={`text-xs mb-1 ${isMe ? 'text-blue-100' : 'text-gray-500'}`}>↪ {message.replyTo.text}</Box>
           )}
-          
-          {message.type === 'image' && message.attachmentUrl && (
-            <Box className="mb-2">
-              <img 
-                src={message.attachmentUrl} 
-                alt="Shared image" 
-                className="max-w-full rounded-lg"
-                style={{ maxHeight: '200px' }}
-              />
-            </Box>
+          {message.attachmentUrl && message.type === 'image' && (
+            <img src={message.attachmentUrl} alt="image" className="rounded mb-2 max-h-64" />
           )}
-          
-          {message.type === 'file' && message.attachmentName && (
-            <Box className="mb-2 p-2 bg-gray-100 dark:bg-gray-600 rounded flex items-center">
-              <AttachFileIcon className="mr-2" />
-              <Typography variant="body2">{safeRender(message.attachmentName)}</Typography>
-            </Box>
+          {message.type === 'audio' && (
+            <AudioPlayer audioUrl={message.attachmentUrl || ''} duration={message.duration} isMe={isMe} />
           )}
-          
-          {message.type === 'location' && message.location && (
-            <Box className="mb-2 p-2 bg-gray-100 dark:bg-gray-600 rounded flex items-center">
-              <LocationIcon className="mr-2 text-red-500" />
-              <Box>
-                <Typography variant="body2" className="font-semibold">Location</Typography>
-                {message.location.address && (
-                  <Typography variant="caption" className="text-gray-600 dark:text-gray-300">
-                    {safeRender(message.location.address)}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
+          {message.location && (
+            <Box className="text-xs mb-1">📍 {message.location.latitude.toFixed(4)}, {message.location.longitude.toFixed(4)}</Box>
           )}
-          
-          {message.type === 'audio' && message.attachmentUrl && (
-            <AudioPlayer 
-              audioUrl={message.attachmentUrl} 
-              duration={message.duration} 
-              isMe={isMe}
-            />
-          )}
-          
-          {message.text && (
-            <div className="mb-1">
-              <Typography variant="body2" component="span" className="inline">
-                {safeRender(message.text)}
-              </Typography>
-              {message.mentions && message.mentions.map(mention => (
-                <Chip
-                  key={mention}
-                  label={safeRender(mention)}
-                  size="small"
-                  className="ml-1 h-5"
-                  color="primary"
-                  variant="outlined"
-                />
-              ))}
-            </div>
-          )}
-          
-          <Box className={`flex items-center ${isMe ? 'justify-end' : 'justify-start'} mt-1`}>
-            <Typography variant="caption" className="text-gray-500 dark:text-gray-400 mr-1">
-              {safeRender(formatTimestamp(message.timestamp))}
-            </Typography>
-            {message.queueInfo && message.status === 'queued' && (
-              <Typography variant="caption" className="text-orange-600 text-xs mr-1">
-                Queue #{safeRender(message.queueInfo.position)}
-              </Typography>
-            )}
+          <Typography variant="body2" className="whitespace-pre-wrap break-words">{message.text}</Typography>
+          <Box className="flex items-center justify-end space-x-1 mt-1">
+            <Typography variant="caption" className={`${isMe ? 'text-blue-100' : 'text-gray-500'}`}>{formatTimestamp(message.timestamp)}</Typography>
             {isMe && getStatusIcon(message.status)}
           </Box>
         </Paper>
       </Box>
     );
+  };
+
+  // Send text message
+  const handleSendMessage = async ({ text }: { text: string }) => {
+    if (!deviceId || !chatId || !text.trim()) return;
+    // Create optimistic message
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const optimistic: Message = {
+      id: tempId,
+      text,
+      timestamp: new Date().toISOString(),
+      from: 'me',
+      to: chatId,
+      sender: 'me',
+      status: 'sending',
+      type: 'text',
+      deviceId: deviceId,
+      replyTo: replyingTo ? { id: replyingTo.id, text: replyingTo.text, sender: replyingTo.sender } : undefined,
+    };
+    addMessage(optimistic);
+    try {
+      const sent = await backendAPI.sendMessage(deviceId, chatId, {
+        body: text,
+        ...(replyingTo?.rawId ? { quotedMessageId: (replyingTo.rawId as any)._serialized || String(replyingTo.rawId) } : {}),
+      });
+      const confirmed = convertBackendMessage(sent);
+      
+      // More careful replacement: only remove temp if we have a valid confirmed message
+      if (confirmed && confirmed.id && confirmed.id !== tempId) {
+        console.log('✅ Replacing optimistic message', tempId, 'with confirmed', confirmed.id);
+        removeMessage(tempId);
+        // Use addOrUpdate to handle any potential WebSocket duplicates
+        addOrUpdateMessages([confirmed]);
+      } else {
+        // If something went wrong with the confirmed message, just update status
+        console.warn('⚠️ Issue with confirmed message, updating status only');
+        updateMessage(tempId, { status: 'sent' });
+      }
+    } catch (e) {
+      console.error('❌ Send message failed:', e);
+      // Keep as queued to avoid showing hard error; poll may confirm
+      updateMessage(tempId, { status: 'queued' });
+    } finally {
+      setReplyingTo(null);
+    }
+  };
+
+  // Upload/send file
+  const handleFileUpload = async (file: File) => {
+    if (!deviceId || !chatId) return;
+    const tempId = `temp-file-${Date.now()}`;
+    const optimistic: Message = {
+      id: tempId,
+      text: file.name,
+      timestamp: new Date().toISOString(),
+      from: 'me',
+      to: chatId,
+      sender: 'me',
+      status: 'sending',
+      type: file.type.startsWith('image') ? 'image' : 'file',
+      deviceId: deviceId,
+    };
+    addMessage(optimistic);
+    try {
+      const toBase64 = (f: File) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
+      const data = await toBase64(file);
+      const sent = await backendAPI.sendUnifiedMessage(deviceId, {
+        to: chatId,
+        media: { data, mimetype: file.type, filename: file.name },
+      });
+      const confirmed = convertBackendMessage(sent);
+      removeMessage(tempId);
+      addOrUpdateMessages([confirmed]);
+    } catch (e) {
+      console.error('File upload failed:', e);
+      updateMessage(tempId, { status: 'queued' });
+    }
+  };
+
+  // Share location from picker
+  const handleLocationShare = async (location: { latitude: number; longitude: number; address?: string }) => {
+    if (!deviceId || !chatId) return;
+    const tempId = `temp-loc-${Date.now()}`;
+    const optimistic: Message = {
+      id: tempId,
+      text: location.address || 'Location',
+      timestamp: new Date().toISOString(),
+      from: 'me',
+      to: chatId,
+      sender: 'me',
+      status: 'sending',
+      type: 'location',
+      deviceId: deviceId,
+      location: { latitude: location.latitude, longitude: location.longitude, address: location.address },
+    };
+    addMessage(optimistic);
+    try {
+      const sent = await backendAPI.sendLocation(deviceId, { to: chatId, latitude: location.latitude, longitude: location.longitude, description: location.address });
+      const confirmed = convertBackendMessage(sent);
+      removeMessage(tempId);
+      addOrUpdateMessages([confirmed]);
+    } catch (e) {
+      updateMessage(tempId, { status: 'queued' });
+    } finally {
+      setShowLocationPicker(false);
+    }
   };
 
   if (!chatId) {
@@ -930,9 +862,17 @@ export function MessageThread({ selectedChat, onShowDetails, onBackToChats, isMo
             <Typography variant="subtitle1" className="font-semibold">
               {chatData?.name}
             </Typography>
-            <Typography variant="caption" className="text-gray-500 dark:text-gray-400">
-              {isTyping ? 'typing...' : (chatData?.isOnline ? 'online' : 'last seen recently')}
-            </Typography>
+            <Box className="flex items-center space-x-1">
+              <Typography variant="caption" className="text-gray-500 dark:text-gray-400">
+                {isTyping ? 'typing...' : (chatData?.isOnline ? 'online' : 'last seen recently')}
+              </Typography>
+              {/* Connection status indicator */}
+              {isSocketConnected ? (
+                <WifiIcon className="text-green-500" style={{ fontSize: '12px' }} />
+              ) : (
+                <WifiOffIcon className="text-orange-500" style={{ fontSize: '12px' }} />
+              )}
+            </Box>
           </Box>
         </Box>
         

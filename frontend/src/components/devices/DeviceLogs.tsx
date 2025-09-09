@@ -181,7 +181,7 @@ export const DeviceLogs: React.FC<DeviceLogsProps> = ({ device, onClose }) => {
       setLogs([])
     } catch (error) {
       console.error('Failed to clear logs:', error)
-      alert('Failed to clear logs. Please try again.')
+      console.warn('Failed to clear logs. Please try again.')
     }
   }
 

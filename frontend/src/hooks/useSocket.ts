@@ -90,8 +90,6 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
     const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:3000';
     const websocketPath = process.env.NEXT_PUBLIC_WEBSOCKET_PATH || '/ws';
     
-    console.log(`🔌 Attempting to connect to device namespace: /device/${targetDeviceId}`);
-    
     // Connect to the device-specific namespace
     const socket = io(`${websocketUrl}/device/${targetDeviceId}`, {
       path: websocketPath,
@@ -110,7 +108,6 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
 
     // Connection event handlers
     socket.on('connect', () => {
-      console.log('✅ Socket connected successfully:', socket.id)
       isConnectingRef.current = false
       setIsConnected(true)
       setConnectionStatus('connected')
@@ -124,7 +121,6 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
     })
 
     socket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason)
       isConnectingRef.current = false
       setIsConnected(false)
       setConnectionStatus('disconnected')
@@ -133,7 +129,7 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
       
       // Only attempt reconnect for unexpected disconnections
       if (reason === 'io server disconnect' || reason === 'io client disconnect') {
-        console.log('🔄 Attempting to reconnect in 2 seconds...')
+        // Attempting to reconnect in 2 seconds
         reconnectTimeoutRef.current = setTimeout(() => {
           if (user && !socketRef.current?.connected) {
             connect(deviceId)
@@ -161,7 +157,6 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
     })
 
     socket.on('reconnect', (attemptNumber) => {
-      console.log('🔄 Socket reconnected after', attemptNumber, 'attempts')
       setIsConnected(true)
       setConnectionStatus('connected')
       
@@ -172,7 +167,7 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
     })
 
     socket.on('reconnect_error', (error) => {
-      console.error('🔄❌ Socket reconnection error:', error)
+      // Socket reconnection error - silenced for production
     })
 
     // Device-specific event listeners based on backend socket events
@@ -210,22 +205,91 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
     })
 
     socket.on('message', (data) => {
-      console.log('💬 Message received:', data.message.id)
-      const message: Message = {
-        id: data.message.id,
-        from: data.message.from || data.message.author,
-        to: data.message.to || data.message.chatId,
-        body: data.message.body,
-        timestamp: data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString(),
-        type: data.message.type || 'text',
-        deviceId: data.deviceId,
-        status: 'delivered',
-        metadata: data.message.hasMedia ? {
-          mimeType: data.message.mimetype,
-          fileName: data.message.filename,
-          size: data.message.filesize
-        } : undefined
+      const msg = data?.message || {}
+      const mimetype: string | undefined = msg.mimetype
+      let type: Message['type'] = 'text'
+      let attachmentUrl: string | undefined
+      let duration: number | undefined
+      let location: { latitude: number; longitude: number; address?: string } | undefined
+
+      if (msg.type === 'location' || msg.location) {
+        type = 'location'
+        if (msg.location) {
+          location = {
+            latitude: Number(msg.location.latitude) || 0,
+            longitude: Number(msg.location.longitude) || 0,
+            address: msg.location.description || msg.location.address,
+          }
+        }
+      } else if (msg.type === 'audio' || (mimetype && mimetype.startsWith('audio'))) {
+        type = 'audio'
+        attachmentUrl = msg.mediaUrl || msg.url
+        duration = Number(msg.duration) || undefined
+      } else if (msg.type === 'image' || (mimetype && mimetype.startsWith('image'))) {
+        type = 'image'
+        attachmentUrl = msg.mediaUrl || msg.url
+      } else if (msg.hasMedia || msg.mediaUrl || mimetype) {
+        type = 'file'
+        attachmentUrl = msg.mediaUrl || msg.url
       }
+
+      // Normalize ID to match backend polling conversion (prefer _serialized)
+      const rawId: any = msg.id ?? msg.key
+      const normalizedId = typeof rawId === 'object' && rawId !== null
+        ? (rawId._serialized || rawId.id || rawId._id || `${rawId.server || ''}:${rawId.user || ''}:${rawId._serialized || ''}` || String(Date.now()))
+        : String(rawId || Date.now())
+
+      const message: Message = {
+        id: normalizedId,
+        rawId: rawId,
+        // Prefer body/text/caption
+        text: String(msg.body || msg.text || msg.caption || ''),
+        // Prefer message timestamp fields, fallback to server-provided wrapper timestamp, then now
+        timestamp: (msg.timestamp || msg.messageTimestamp || data?.timestamp)
+          ? new Date((msg.timestamp || msg.messageTimestamp || data?.timestamp) * (String(msg.timestamp).length === 13 ? 1 : 1000)).toISOString()
+          : new Date().toISOString(),
+        from: String(msg.from || msg.author || ''),
+        to: String(msg.to || msg.chatId || ''),
+        sender: msg.fromMe ? 'me' : 'other',
+        status: msg.fromMe ? 'sent' : 'delivered',
+        type,
+        deviceId: String(data?.deviceId || ''),
+        attachmentUrl,
+        attachmentName: msg.filename,
+        duration,
+        location,
+        metadata: msg.hasMedia ? {
+          mimeType: mimetype,
+          fileName: msg.filename,
+          size: msg.filesize,
+        } : undefined,
+      }
+      // Dedupe and update: if a message with same ID already exists, update it instead of adding new
+      try {
+        const existing = useRealtimeStore.getState().messages
+        const existingMessage = existing.find(m => m.id === normalizedId)
+        if (existingMessage) {
+          // Update existing message with new status/data
+          // Updating existing message with new status
+          updateMessage(normalizedId, {
+            status: message.status,
+            timestamp: message.timestamp,
+            // Only update other fields if they're not already set (preserve optimistic updates)
+            ...(existingMessage.status === 'sending' && {
+              text: message.text,
+              attachmentUrl: message.attachmentUrl,
+              type: message.type,
+              metadata: message.metadata
+            })
+          })
+          return
+        }
+      } catch (e) {
+        console.warn('Error checking for existing message:', e)
+      }
+      
+      // Add new message if it doesn't exist
+      // Adding new message via WebSocket
       addMessage(message)
     })
 
@@ -253,7 +317,6 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
 
     // Message acknowledgment events
     socket.on('message-ack', (data) => {
-      console.log('✅ Message acknowledged:', data.messageId)
       updateMessage(data.messageId, { status: 'delivered' })
     })
 
@@ -287,7 +350,7 @@ export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
     if (socketRef.current?.connected) {
       socketRef.current.emit(event, data)
     } else {
-      console.warn('Socket not connected, cannot emit event:', event)
+      // Socket not connected, cannot emit event
     }
   }
 
