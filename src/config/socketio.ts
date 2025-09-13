@@ -16,6 +16,12 @@ import {
 function isOriginAllowed(origin: string): boolean {
   if (!origin) return false;
   
+  // Check if CORS_ALLOW_ALL is enabled for debugging
+  if (process.env.CORS_ALLOW_ALL === 'true') {
+    console.log(`Socket.IO CORS_ALLOW_ALL enabled - allowing origin: ${origin}`);
+    return true;
+  }
+  
   // Parse the origin to get the host
   let hostname: string;
   try {
@@ -32,6 +38,11 @@ function isOriginAllowed(origin: string): boolean {
   
   // Allow the custom domain
   if (hostname === 'hd.verp.dev') {
+    return true;
+  }
+  
+  // Allow ngrok tunnels (for development)
+  if (hostname.endsWith('.ngrok.io') || hostname.endsWith('.ngrok-free.app')) {
     return true;
   }
   

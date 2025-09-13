@@ -36,15 +36,27 @@ app.use(morgan('combined', { stream: morganLoggerStream }));
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
+  // Log the origin for debugging
+  if (origin) {
+    logger.info(`CORS request from origin: ${origin}`);
+  }
+  
   // Function to check if origin is allowed
   const isOriginAllowed = (origin?: string): boolean => {
     if (!origin) return true; // Allow requests without origin
+    
+    // Check if CORS_ALLOW_ALL is enabled for debugging
+    if (process.env.CORS_ALLOW_ALL === 'true') {
+      logger.info(`CORS_ALLOW_ALL enabled - allowing origin: ${origin}`);
+      return true;
+    }
     
     let hostname: string;
     try {
       const url = new URL(origin);
       hostname = url.hostname;
     } catch {
+      logger.warn(`Invalid origin URL: ${origin}`);
       return false;
     }
     
@@ -55,6 +67,11 @@ app.use((req, res, next) => {
     
     // Allow the custom domain
     if (hostname === 'hd.verp.dev') {
+      return true;
+    }
+    
+    // Allow ngrok tunnels (for development)
+    if (hostname.endsWith('.ngrok.io') || hostname.endsWith('.ngrok-free.app')) {
       return true;
     }
     
@@ -69,11 +86,16 @@ app.use((req, res, next) => {
     return allowedOrigins.some(allowed => allowed.trim() === origin);
   };
   
-  if (isOriginAllowed(origin)) {
+  const allowed = isOriginAllowed(origin);
+  
+  if (allowed) {
     res.header('Access-Control-Allow-Origin', origin || '*');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key, ngrok-skip-browser-warning');
+    logger.debug(`CORS allowed for origin: ${origin}`);
+  } else {
+    logger.warn(`CORS blocked for origin: ${origin}`);
   }
   
   // Handle preflight requests
