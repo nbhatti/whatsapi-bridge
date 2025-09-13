@@ -1,0 +1,74 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: whatsapp-api-server
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PORT=3000
+    env_file:
+      - .env
+    volumes:
+      - ./src:/usr/src/app/src
+      - ./dist:/usr/src/app/dist
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: ["npm", "run", "dev"]
+    networks:
+      - whatsapp-network
+
+  postgres:
+    image: postgres:16
+    container_name: whatsapp-postgres-server
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=whatsapi
+      - POSTGRES_USER=${POSTGRES_USER:-whatsapi_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-whatsapi_password}
+    env_file:
+      - .env
+    volumes:
+      - postgres_data_server:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - whatsapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: whatsapp-redis-server
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data_server:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - whatsapp-network
+
+volumes:
+  redis_data_server:
+  postgres_data_server:
+
+networks:
+  whatsapp-network:
+    driver: bridge
