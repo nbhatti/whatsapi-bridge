@@ -32,6 +32,59 @@ const server = createServer(app);
 // Morgan HTTP request logging
 app.use(morgan('combined', { stream: morganLoggerStream }));
 
+// CORS Middleware for HTTP requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Function to check if origin is allowed
+  const isOriginAllowed = (origin?: string): boolean => {
+    if (!origin) return true; // Allow requests without origin
+    
+    let hostname: string;
+    try {
+      const url = new URL(origin);
+      hostname = url.hostname;
+    } catch {
+      return false;
+    }
+    
+    // Allow localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+    
+    // Allow the custom domain
+    if (hostname === 'hd.verp.dev') {
+      return true;
+    }
+    
+    // Check if hostname is in the 10.2.20.0/22 range (10.2.20.0 to 10.2.23.255)
+    const ipRegex = /^10\.2\.(2[0-3]|20|21|22|23)\.(\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/;
+    if (ipRegex.test(hostname)) {
+      return true;
+    }
+    
+    // Check against explicit CORS origins from environment
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    return allowedOrigins.some(allowed => allowed.trim() === origin);
+  };
+  
+  if (isOriginAllowed(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key');
+  }
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
+
 // Core Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

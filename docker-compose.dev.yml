@@ -26,6 +26,25 @@ services:
     networks:
       - whatsapp-network
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: whatsapp-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - whatsapp-network
+    depends_on:
+      - api
+
   postgres:
     image: postgres:16
     container_name: whatsapp-postgres-dev

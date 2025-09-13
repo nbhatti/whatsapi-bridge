@@ -12,10 +12,52 @@ import {
   SocketData,
 } from '../types/socket.types';
 
+// CORS origin validation function to support network ranges
+function isOriginAllowed(origin: string): boolean {
+  if (!origin) return false;
+  
+  // Parse the origin to get the host
+  let hostname: string;
+  try {
+    const url = new URL(origin);
+    hostname = url.hostname;
+  } catch {
+    return false;
+  }
+  
+  // Allow localhost
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return true;
+  }
+  
+  // Allow the custom domain
+  if (hostname === 'hd.verp.dev') {
+    return true;
+  }
+  
+  // Check if hostname is in the 10.2.20.0/22 range (10.2.20.0 to 10.2.23.255)
+  const ipRegex = /^10\.2\.(2[0-3]|20|21|22|23)\.(\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/;
+  if (ipRegex.test(hostname)) {
+    return true;
+  }
+  
+  // Check against explicit CORS origins from environment
+  const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'];
+  return allowedOrigins.some(allowed => allowed.trim() === origin);
+}
+
 export const socketConfig: Partial<ServerOptions> = {
   path: '/ws',
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Always allow requests without origin (like mobile apps, Postman, etc.)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      const allowed = isOriginAllowed(origin);
+      callback(null, allowed);
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
