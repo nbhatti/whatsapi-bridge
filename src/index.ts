@@ -5,12 +5,15 @@ import morgan from 'morgan';
 import { logger, morganLoggerStream, validateEnvironment, initializeRedis, initializeSocketIO, setupSwagger, getRedisClient } from './config';
 import { 
   apiKeyAuth, 
-  apiRateLimiter, 
+  // apiRateLimiter, // Disabled for troubleshooting
   errorHandler, 
   notFoundHandler, 
   uncaughtExceptionHandler, 
   unhandledRejectionHandler 
 } from './middlewares';
+
+// No-op rate limiter for development
+const apiRateLimiter = (req: any, res: any, next: any) => next();
 import { PORT } from './config/constants';
 import { DeviceManager, MessageQueueService, DeviceHealthService } from './services';
 import routes from './routes';
@@ -64,61 +67,75 @@ initializeSocketIO(server);
 // Setup Swagger docs (before auth middleware to allow public access)
 setupSwagger(app);
 
-// Security and Rate Limiting Middleware (apply after docs setup)
-app.use(apiRateLimiter);
+// Simple health check endpoint (no dependencies)
+app.get('/ping', (req, res) => {
+  res.json({ message: 'pong', timestamp: new Date().toISOString() });
+});
+
+// Health check endpoint (before auth to allow public access)
+app.get('/health', async (req, res) => {
+  try {
+    const healthCheck = {
+      status: 'OK',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      checks: {
+        redis: 'UNKNOWN',
+        memory: 'OK',
+        server: 'OK',
+      },
+      metadata: {
+        version: process.env.npm_package_version || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        node_version: process.version,
+      },
+    };
+
+    let overallStatus = 200;
+
+    // Check Redis connection
+    try {
+      const redisClient = getRedisClient();
+      const redisPing = await redisClient.ping();
+      healthCheck.checks.redis = redisPing === 'PONG' ? 'OK' : 'FAIL';
+      if (healthCheck.checks.redis === 'FAIL') {
+        overallStatus = 503;
+        healthCheck.status = 'DEGRADED';
+      }
+    } catch (error) {
+      logger.error('Redis health check failed', error);
+      healthCheck.checks.redis = 'FAIL';
+      overallStatus = 503;
+      healthCheck.status = 'DEGRADED';
+    }
+
+    // Check memory usage
+    const memUsage = process.memoryUsage();
+    const memUsagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+    if (memUsagePercent > 90) {
+      healthCheck.checks.memory = 'WARN';
+      if (healthCheck.status === 'OK') {
+        healthCheck.status = 'DEGRADED';
+      }
+    }
+
+    res.status(overallStatus).json(healthCheck);
+  } catch (error) {
+    logger.error('Health check endpoint error', error);
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Health check failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Security and Rate Limiting Middleware (apply after docs and health setup)
+app.use(apiRateLimiter); // Using no-op version for development
 app.use(apiKeyAuth);
 
 // API routes
 app.use('/api', routes);
-
-// Health check endpoint
-app.get('/health', async (req, res) => {
-  const healthCheck = {
-    status: 'OK',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    checks: {
-      redis: 'UNKNOWN',
-      memory: 'OK',
-      server: 'OK',
-    },
-    metadata: {
-      version: process.env.npm_package_version || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      node_version: process.version,
-    },
-  };
-
-  let overallStatus = 200;
-
-  // Check Redis connection
-  try {
-    const redisClient = getRedisClient();
-    const redisPing = await redisClient.ping();
-    healthCheck.checks.redis = redisPing === 'PONG' ? 'OK' : 'FAIL';
-    if (healthCheck.checks.redis === 'FAIL') {
-      overallStatus = 503;
-      healthCheck.status = 'DEGRADED';
-    }
-  } catch (error) {
-    logger.error('Redis health check failed', error);
-    healthCheck.checks.redis = 'FAIL';
-    overallStatus = 503;
-    healthCheck.status = 'DEGRADED';
-  }
-
-  // Check memory usage
-  const memUsage = process.memoryUsage();
-  const memUsagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-  if (memUsagePercent > 90) {
-    healthCheck.checks.memory = 'WARN';
-    if (healthCheck.status === 'OK') {
-      healthCheck.status = 'DEGRADED';
-    }
-  }
-
-  res.status(overallStatus).json(healthCheck);
-});
 
 // Error Handling Middleware (should be last)
 app.use(notFoundHandler);

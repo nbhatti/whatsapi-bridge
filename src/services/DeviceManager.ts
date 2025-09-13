@@ -1,6 +1,7 @@
 
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import { getRedisClient } from '../config/redis';
+import { env } from '../config/env';
 import logger, { logError, logInfo } from '../config/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { Redis } from 'ioredis';
@@ -71,13 +72,20 @@ export interface Device {
 export class DeviceManager {
     private static instance: DeviceManager;
     private devices: Map<string, Device>;
-    private redisClient;
-    private redisStore;
+    private redisClient: Redis | null;
+    private redisStore: RedisStore | null;
 
     private constructor() {
         this.devices = new Map();
-        this.redisClient = getRedisClient();
-        this.redisStore = new RedisStore(this.redisClient);
+        
+        if (env.REDIS_ENABLED) {
+            this.redisClient = getRedisClient();
+            this.redisStore = new RedisStore(this.redisClient);
+        } else {
+            this.redisClient = null;
+            this.redisStore = null;
+            logger.info('DeviceManager initialized without Redis (Redis disabled)');
+        }
     }
 
     /**
@@ -136,8 +144,11 @@ export class DeviceManager {
         };
 
         this.devices.set(deviceId, device);
-        await this.redisClient.sadd(DEVICES_SET_KEY, deviceId);
-        await this.updateDeviceInRedis(device);
+        
+        if (this.redisClient) {
+            await this.redisClient.sadd(DEVICES_SET_KEY, deviceId);
+            await this.updateDeviceInRedis(device);
+        }
 
         this.attachEventListeners(device);
 
@@ -241,6 +252,11 @@ export class DeviceManager {
     }
 
     public async restoreDevicesFromRedis(): Promise<void> {
+        if (!this.redisClient) {
+            logger.info('Redis is disabled, skipping device restoration');
+            return;
+        }
+        
         logInfo('Initiating device restoration from Redis storage...');
         const deviceIds = await this.redisClient.smembers(DEVICES_SET_KEY);
         

@@ -70,13 +70,13 @@ export { register };
 
 // Helper functions for common metric operations
 export class MetricsService {
-  static incrementCacheHits(cacheType: 'in' | 'out', operation: 'get' | 'set' | 'delete'): void {
+  static incrementCacheHits(cacheType: 'in' | 'out' | 'chats' | 'chat_details' | 'chat_participants', operation: 'get' | 'set' | 'delete' | 'hit' | 'miss' | 'expired'): void {
     if (config.metrics.prometheus.enabled) {
       cacheHitsCounter.inc({ cache_type: cacheType, operation });
     }
   }
 
-  static incrementCacheFlushes(flushType: 'manual' | 'auto' | 'full'): void {
+  static incrementCacheFlushes(flushType: 'manual' | 'auto' | 'full' | 'device_invalidation' | 'chat_invalidation' | 'chat_clear_all'): void {
     if (config.metrics.prometheus.enabled) {
       cacheFlushesCounter.inc({ flush_type: flushType });
     }

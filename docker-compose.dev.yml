@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
+      target: development
     container_name: whatsapp-api-dev
     restart: unless-stopped
     ports:
@@ -23,20 +23,6 @@ services:
       postgres:
         condition: service_healthy
     command: ["npm", "run", "dev"]
-    networks:
-      - whatsapp-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: whatsapp-frontend-dev
-    restart: unless-stopped
-    ports:
-      - "4000:4000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - whatsapp-network
 

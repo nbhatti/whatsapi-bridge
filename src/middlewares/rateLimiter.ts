@@ -104,12 +104,12 @@ export const skipRateLimit = (req: Request): boolean => {
 export const createRateLimiter = (config: RateLimiterConfig): RateLimitRequestHandler => {
   const finalConfig = { ...defaultConfig, ...config };
   
-  const store = createRedisStore(finalConfig.keyPrefix);
+  // const store = createRedisStore(finalConfig.keyPrefix); // Disabled for now
   
   return rateLimit({
     windowMs: finalConfig.windowMs!,
     max: finalConfig.max!,
-    store: store, // Will fall back to memory store if Redis store creation fails
+    // store: store, // Temporarily disabled Redis store due to compatibility issues
     // Remove keyGenerator completely to use default which is IPv6-safe
     message: {
       success: false,

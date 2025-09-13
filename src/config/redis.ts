@@ -1,5 +1,6 @@
 import { Redis } from 'ioredis';
 import logger, { logError } from './logger';
+import { env } from './env';
 
 let redisClient: Redis | null = null;
 
@@ -8,6 +9,10 @@ let redisClient: Redis | null = null;
  * Uses REDIS_URL if available, otherwise falls back to individual Redis config variables
  */
 export const getRedisClient = (): Redis => {
+  if (!env.REDIS_ENABLED) {
+    throw new Error('Redis is disabled. Cannot get Redis client.');
+  }
+  
   if (!redisClient) {
     const redisUrl = process.env.REDIS_URL;
     
@@ -82,6 +87,11 @@ export const getRedisClient = (): Redis => {
  * Call this during application startup
  */
 export const initializeRedis = async (): Promise<void> => {
+  if (!env.REDIS_ENABLED) {
+    logger.info('Redis is disabled, skipping Redis initialization');
+    return;
+  }
+  
   try {
     const client = getRedisClient();
     await client.connect();
