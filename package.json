@@ -145,7 +145,7 @@
     "@types/joi": "^17.2.3",
     "@types/mime-types": "^3.0.1",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^24.2.0",
+    "@types/node": "^24.5.0",
     "@types/node-fetch": "^2.6.13",
     "@types/qrcode": "^1.5.5",
     "@types/qrcode-terminal": "^0.12.2",
