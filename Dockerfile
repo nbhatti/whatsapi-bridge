@@ -1,6 +1,6 @@
 
 # Stage 1: Build the application
-FROM node:24-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /usr/src/app
 
@@ -17,7 +17,7 @@ COPY src ./src
 RUN npm run build
 
 # Stage 2: Development runtime
-FROM node:24-alpine AS development
+FROM node:25-alpine AS development
 
 WORKDIR /usr/src/app
 
@@ -66,7 +66,7 @@ ENTRYPOINT ["dumb-init", "--"]
 CMD ["npm", "run", "dev"]
 
 # Stage 3: Production runtime
-FROM node:24-alpine AS production
+FROM node:25-alpine AS production
 
 WORKDIR /usr/src/app
 
