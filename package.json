@@ -114,7 +114,7 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.11.0",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.0.1",
     "ioredis": "^5.7.0",
     "joi": "^18.0.0",
